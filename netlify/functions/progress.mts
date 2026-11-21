@@ -15,6 +15,23 @@ function sanitizeCode(raw: string | null): string | null {
 
 export default async (req: Request, _context: Context) => {
   const url = new URL(req.url);
+  const store = getStore("ex378-progress");
+
+  if (req.method === "GET" && url.searchParams.get("list") === "1") {
+    const { blobs } = await store.list({ prefix: "profile/" });
+    const profiles = await Promise.all(
+      blobs.slice(0, 50).map(async (b) => {
+        const code = b.key.replace(/^profile\//, "");
+        const data = (await store.get(b.key, { type: "json" })) as ProgressPayload | null;
+        if (!data || !data.state) {
+          return { code, updatedAt: null, state: null };
+        }
+        return { code, updatedAt: data.updatedAt, state: data.state };
+      })
+    );
+    return Response.json({ profiles });
+  }
+
   const code = sanitizeCode(url.searchParams.get("code"));
 
   if (!code) {
@@ -24,7 +41,6 @@ export default async (req: Request, _context: Context) => {
     );
   }
 
-  const store = getStore("ex378-progress");
   const key = `profile/${code}`;
 
   if (req.method === "GET") {

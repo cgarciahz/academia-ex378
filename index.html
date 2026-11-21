@@ -166,6 +166,10 @@
         class="px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm theme-card border hover:opacity-90 transition-all flex items-center gap-2">
         <span>🃏</span> 3. Diccionario & Flashcards: ¿Cuándo Usar Cada Anotación?
       </button>
+      <button id="tab-btn-progress" onclick="window.switchTab('progress')"
+        class="px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm theme-card border hover:opacity-90 transition-all flex items-center gap-2">
+        <span>📊</span> 4. Progreso por Código & Intentos
+      </button>
     </div>
 
     <!-- PESTAÑA 1: ESTUDIAR TEMAS -->
@@ -329,6 +333,101 @@
         <div id="annotation-dictionary-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       </div>
 
+    </section>
+
+    <!-- PESTAÑA 4: TABLA DE PROGRESO POR CÓDIGO E INTENTOS -->
+    <section id="tab-section-progress" class="hidden max-w-6xl mx-auto space-y-6">
+      <div class="theme-card border rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold">☁️ Códigos de Sincronización Registrados</h2>
+            <p class="text-xs theme-text-muted">Resumen de avance guardado en Netlify Blobs por cada código (superadas al 1er intento, reconsideradas al 2º/3º/4º+ intento y falladas pendientes).</p>
+          </div>
+          <button onclick="window.refreshProgressDashboard()"
+            class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shrink-0">
+            🔄 Actualizar desde la nube
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs sm:text-sm border-collapse">
+            <thead>
+              <tr class="border-b theme-text-muted text-xs uppercase">
+                <th class="py-2.5 pr-3">Código</th>
+                <th class="py-2.5 px-3">XP / Precisión</th>
+                <th class="py-2.5 px-3">✅ 1er intento</th>
+                <th class="py-2.5 px-3">🔄 Reconsideradas (2º+)</th>
+                <th class="py-2.5 px-3">❌ Falladas</th>
+                <th class="py-2.5 px-3">Temas avanzados</th>
+                <th class="py-2.5 px-3">Última actividad</th>
+                <th class="py-2.5 pl-3 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="progress-codes-tbody" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="theme-card border rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold">🎯 Avance por Objetivo EX378 <span id="progress-active-code-label" class="text-indigo-600 text-sm font-semibold"></span></h2>
+            <p class="text-xs theme-text-muted">Desglose de preguntas superadas a la primera, reconsideradas tras fallar (2º, 3º, 4º+ intento) y pendientes por tema.</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs sm:text-sm border-collapse">
+            <thead>
+              <tr class="border-b theme-text-muted text-xs uppercase">
+                <th class="py-2.5 pr-3">Objetivo EX378</th>
+                <th class="py-2.5 px-3 text-center">Total</th>
+                <th class="py-2.5 px-3 text-center">✅ 1er intento</th>
+                <th class="py-2.5 px-3 text-center">🔄 Reconsideradas</th>
+                <th class="py-2.5 px-3 text-center">❌ Falladas</th>
+                <th class="py-2.5 px-3">Dominio</th>
+                <th class="py-2.5 pl-3 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="progress-modules-tbody" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="theme-card border rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold">📝 Historial Detallado de Preguntas</h2>
+            <p class="text-xs theme-text-muted">Filtra para ver exactamente qué preguntas fallaste, cuáles superaste al 2º, 3º o 4º+ intento y cuáles dominaste a la primera.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <select id="progress-filter-status" onchange="window.renderProgressQuestionTable()"
+              class="theme-subtle border rounded-xl px-3 py-1.5 text-xs font-semibold">
+              <option value="answered">Todas las respondidas</option>
+              <option value="failing">❌ Solo falladas pendientes</option>
+              <option value="recovered">🔄 Solo reconsideradas (2º+ intento)</option>
+              <option value="first">✅ Solo superadas 1er intento</option>
+            </select>
+            <select id="progress-filter-module" onchange="window.renderProgressQuestionTable()"
+              class="theme-subtle border rounded-xl px-3 py-1.5 text-xs font-semibold">
+              <option value="all">Todos los temas</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs sm:text-sm border-collapse">
+            <thead>
+              <tr class="border-b theme-text-muted text-xs uppercase">
+                <th class="py-2.5 pr-3">ID</th>
+                <th class="py-2.5 px-3">Objetivo</th>
+                <th class="py-2.5 px-3">Pregunta</th>
+                <th class="py-2.5 px-3 text-center">Intentos</th>
+                <th class="py-2.5 px-3 text-center">Fallos</th>
+                <th class="py-2.5 pl-3">Estado</th>
+              </tr>
+            </thead>
+            <tbody id="progress-questions-tbody" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
   </main>

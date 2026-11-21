@@ -534,12 +534,15 @@
     state.totalAnswered++;
 
     if (!state.questionStats[qId]) {
-      state.questionStats[qId] = { wrongCount: 0, consecutiveCorrectNeeded: 0, mastered: false };
+      state.questionStats[qId] = { wrongCount: 0, consecutiveCorrectNeeded: 0, mastered: false, attempts: 0, correctCount: 0 };
     }
     const qStat = state.questionStats[qId];
+    qStat.attempts = (qStat.attempts || 0) + 1;
+    qStat.lastAttemptAt = new Date().toISOString();
 
     if (isCorrect) {
       state.totalCorrect++;
+      qStat.correctCount = (qStat.correctCount || 0) + 1;
       state.streak++;
       if (state.streak > state.bestStreak) state.bestStreak = state.streak;
       state.xp += 15;
@@ -548,15 +551,18 @@
         qStat.consecutiveCorrectNeeded--;
         if (qStat.consecutiveCorrectNeeded === 0) {
           qStat.mastered = true;
+          if (!qStat.passedAtAttempt) qStat.passedAtAttempt = qStat.attempts;
           state.wrongQueue = state.wrongQueue.filter(id => id !== qId);
         }
       } else {
         qStat.mastered = true;
+        if (!qStat.passedAtAttempt) qStat.passedAtAttempt = qStat.attempts;
       }
     } else {
       state.streak = 0;
       qStat.wrongCount++;
       qStat.mastered = false;
+      qStat.passedAtAttempt = null;
       qStat.consecutiveCorrectNeeded = 2;
       if (!state.wrongQueue.includes(qId)) {
         state.wrongQueue.push(qId);
@@ -770,7 +776,7 @@
   };
 
   window.switchTab = function (tabName) {
-    ["study", "quiz", "flashcards"].forEach(t => {
+    ["study", "quiz", "flashcards", "progress"].forEach(t => {
       const sec = document.getElementById("tab-section-" + t);
       const btn = document.getElementById("tab-btn-" + t);
       if (sec) sec.classList.toggle("hidden", t !== tabName);
@@ -785,6 +791,9 @@
     }
     if (tabName === "flashcards") {
       window.switchAnnotationView(state.annotationSubView || "cards");
+    }
+    if (tabName === "progress") {
+      window.refreshProgressDashboard();
     }
   };
 
@@ -839,6 +848,229 @@
     renderStudySidebar();
     renderStudyDetail();
     loadNextQuizQuestion();
+  };
+
+  let cloudProfilesCache = [];
+  let inspectedProfileCode = null;
+
+  function classifyQuestionStat(st) {
+    if (!st) return "unseen";
+    const wrong = st.wrongCount || 0;
+    if (st.mastered) {
+      return wrong === 0 ? "first" : "recovered";
+    }
+    return wrong > 0 ? "failing" : "unseen";
+  }
+
+  function summarizeProgressState(targetState) {
+    const qStats = (targetState && targetState.questionStats) || {};
+    let first = 0;
+    let recovered = 0;
+    let failing = 0;
+    const modStats = {};
+    window.STUDY_MODULES.forEach(m => {
+      modStats[m.id] = { total: 0, first: 0, recovered: 0, failing: 0 };
+    });
+
+    window.QUESTION_BANK.forEach(q => {
+      if (!modStats[q.module]) return;
+      modStats[q.module].total++;
+      const status = classifyQuestionStat(qStats[q.id]);
+      if (status === "first") {
+        first++;
+        modStats[q.module].first++;
+      } else if (status === "recovered") {
+        recovered++;
+        modStats[q.module].recovered++;
+      } else if (status === "failing") {
+        failing++;
+        modStats[q.module].failing++;
+      }
+    });
+
+    const advancedTopics = Object.values(modStats).filter(m => m.first + m.recovered > 0).length;
+    const answered = (targetState && targetState.totalAnswered) || 0;
+    const correct = (targetState && targetState.totalCorrect) || 0;
+    const acc = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+
+    return { first, recovered, failing, modStats, advancedTopics, acc, xp: (targetState && targetState.xp) || 0 };
+  }
+
+  function getInspectedStateAndLabel() {
+    if (inspectedProfileCode) {
+      const found = cloudProfilesCache.find(p => p.code === inspectedProfileCode);
+      if (found && found.state) {
+        return { label: `(${found.code})`, targetState: found.state };
+      }
+    }
+    const localCode = getSyncCode();
+    return { label: localCode ? `(${localCode} - actual)` : "(Sesión local actual)", targetState: state };
+  }
+
+  function populateProgressModuleFilter() {
+    const sel = document.getElementById("progress-filter-module");
+    if (!sel || sel.options.length > 1) return;
+    window.STUDY_MODULES.forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m.id;
+      opt.textContent = `${m.icon} ${m.title}`;
+      sel.appendChild(opt);
+    });
+  }
+
+  window.renderProgressQuestionTable = function () {
+    const tbody = document.getElementById("progress-questions-tbody");
+    if (!tbody) return;
+    populateProgressModuleFilter();
+
+    const statusFilter = (document.getElementById("progress-filter-status") || {}).value || "answered";
+    const modFilter = (document.getElementById("progress-filter-module") || {}).value || "all";
+    const { targetState } = getInspectedStateAndLabel();
+    const qStats = (targetState && targetState.questionStats) || {};
+
+    const modMap = {};
+    window.STUDY_MODULES.forEach(m => { modMap[m.id] = `${m.icon} ${m.title}`; });
+
+    const rows = [];
+    window.QUESTION_BANK.forEach(q => {
+      if (modFilter !== "all" && q.module !== modFilter) return;
+      const st = qStats[q.id];
+      const status = classifyQuestionStat(st);
+      if (status === "unseen") return;
+      if (statusFilter !== "answered" && status !== statusFilter) return;
+
+      const wrong = st.wrongCount || 0;
+      const attempts = st.attempts || (wrong + (st.mastered ? 1 : 0));
+      let badge = "";
+      if (status === "first") {
+        badge = `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">✅ Superada 1er intento</span>`;
+      } else if (status === "recovered") {
+        const at = st.passedAtAttempt || attempts;
+        badge = `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30">🔄 Reconsiderada (${at}º intento)</span>`;
+      } else {
+        const needed = st.consecutiveCorrectNeeded || 2;
+        badge = `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-500/15 text-rose-600 border border-rose-500/30">❌ Fallada (faltan ${needed})</span>`;
+      }
+
+      rows.push(`
+        <tr class="hover:opacity-90">
+          <td class="py-2.5 pr-3 font-mono text-xs theme-text-muted whitespace-nowrap">${escapeHtml(q.id)}</td>
+          <td class="py-2.5 px-3 text-xs font-semibold whitespace-nowrap">${escapeHtml(modMap[q.module] || q.module)}</td>
+          <td class="py-2.5 px-3 text-xs max-w-md">${escapeHtml(q.question.slice(0, 120))}${q.question.length > 120 ? "..." : ""}</td>
+          <td class="py-2.5 px-3 text-center font-bold text-xs">${attempts}</td>
+          <td class="py-2.5 px-3 text-center font-bold text-xs text-rose-500">${wrong}</td>
+          <td class="py-2.5 pl-3 whitespace-nowrap">${badge}</td>
+        </tr>
+      `);
+    });
+
+    tbody.innerHTML = rows.length
+      ? rows.join("")
+      : `<tr><td colspan="6" class="py-6 text-center text-xs theme-text-muted">No hay preguntas registradas con este filtro todavía.</td></tr>`;
+  };
+
+  function renderProgressModulesTable() {
+    const tbody = document.getElementById("progress-modules-tbody");
+    const labelEl = document.getElementById("progress-active-code-label");
+    if (!tbody) return;
+
+    const { label, targetState } = getInspectedStateAndLabel();
+    if (labelEl) labelEl.textContent = label;
+
+    const summary = summarizeProgressState(targetState);
+    tbody.innerHTML = window.STUDY_MODULES.map(m => {
+      const ms = summary.modStats[m.id] || { total: 0, first: 0, recovered: 0, failing: 0 };
+      const masteredTotal = ms.first + ms.recovered;
+      const pct = ms.total > 0 ? Math.round((masteredTotal / ms.total) * 100) : 0;
+      return `
+        <tr>
+          <td class="py-2.5 pr-3 font-semibold text-xs sm:text-sm">${m.icon} ${escapeHtml(m.title)}</td>
+          <td class="py-2.5 px-3 text-center text-xs font-bold">${ms.total}</td>
+          <td class="py-2.5 px-3 text-center text-xs font-bold text-emerald-600">${ms.first}</td>
+          <td class="py-2.5 px-3 text-center text-xs font-bold text-amber-600">${ms.recovered}</td>
+          <td class="py-2.5 px-3 text-center text-xs font-bold text-rose-600">${ms.failing}</td>
+          <td class="py-2.5 px-3 min-w-[120px]">
+            <div class="flex items-center gap-2">
+              <div class="w-full h-2 rounded-full theme-subtle overflow-hidden">
+                <div class="h-full bg-emerald-500" style="width:${pct}%"></div>
+              </div>
+              <span class="text-xs font-bold w-9 text-right">${pct}%</span>
+            </div>
+          </td>
+          <td class="py-2.5 pl-3 text-right">
+            <button onclick="window.onQuizFilterChange('${m.id}'); window.switchTab('quiz');"
+              class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold">
+              Practicar
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    window.renderProgressQuestionTable();
+  }
+
+  window.selectProgressProfile = function (code) {
+    inspectedProfileCode = code;
+    renderProgressModulesTable();
+  };
+
+  window.loadProfileIntoCurrent = function (code) {
+    setSyncCode(code);
+    const url = new URL(location.href);
+    url.searchParams.set("sync", code);
+    history.replaceState(null, "", url.toString());
+    inspectedProfileCode = null;
+    pullCloudState(true).then(() => window.refreshProgressDashboard());
+  };
+
+  window.refreshProgressDashboard = async function () {
+    const tbody = document.getElementById("progress-codes-tbody");
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="8" class="py-4 text-center text-xs theme-text-muted">Cargando códigos desde Netlify Blobs...</td></tr>`;
+    }
+    try {
+      const res = await fetch("/api/progress?list=1");
+      if (res.ok) {
+        const data = await res.json();
+        cloudProfilesCache = (data.profiles || []).filter(p => p.state);
+      }
+    } catch (e) {
+      cloudProfilesCache = [];
+    }
+
+    if (tbody) {
+      const activeCode = getSyncCode();
+      if (cloudProfilesCache.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="py-4 text-center text-xs theme-text-muted">No hay códigos guardados en la nube todavía. Usa el botón ☁️ Sync arriba para registrar uno.</td></tr>`;
+      } else {
+        tbody.innerHTML = cloudProfilesCache.map(p => {
+          const s = summarizeProgressState(p.state);
+          const dateStr = p.updatedAt ? new Date(p.updatedAt).toLocaleString() : "-";
+          const isCurrent = p.code === activeCode;
+          return `
+            <tr class="${isCurrent ? "bg-indigo-500/10" : ""}">
+              <td class="py-2.5 pr-3 font-mono font-bold text-xs sm:text-sm">
+                ${escapeHtml(p.code)} ${isCurrent ? '<span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white">activo</span>' : ""}
+              </td>
+              <td class="py-2.5 px-3 text-xs font-semibold">${s.xp} XP · ${s.acc}%</td>
+              <td class="py-2.5 px-3 text-xs font-bold text-emerald-600">${s.first}</td>
+              <td class="py-2.5 px-3 text-xs font-bold text-amber-600">${s.recovered}</td>
+              <td class="py-2.5 px-3 text-xs font-bold text-rose-600">${s.failing}</td>
+              <td class="py-2.5 px-3 text-xs font-semibold">${s.advancedTopics} / ${window.STUDY_MODULES.length}</td>
+              <td class="py-2.5 px-3 text-xs theme-text-muted whitespace-nowrap">${escapeHtml(dateStr)}</td>
+              <td class="py-2.5 pl-3 text-right whitespace-nowrap space-x-1">
+                <button onclick="window.selectProgressProfile('${escapeHtml(p.code)}')"
+                  class="px-2.5 py-1 rounded-lg theme-subtle border text-xs font-semibold hover:opacity-80">Ver tabla</button>
+                ${!isCurrent ? `<button onclick="window.loadProfileIntoCurrent('${escapeHtml(p.code)}')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-500">Usar</button>` : ""}
+              </td>
+            </tr>
+          `;
+        }).join("");
+      }
+    }
+
+    renderProgressModulesTable();
   };
 
   window.configureCloudSync = function () {
