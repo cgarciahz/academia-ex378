@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Academia Interactiva EX378 — Quarkus 3.8</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    html[data-theme="light"] {
+      --bg-page: #f8fafc;
+      --bg-header: rgba(255, 255, 255, 0.95);
+      --bg-card: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --bg-analogy: #eef2ff;
+      --border-analogy: #c7d2fe;
+      --text-analogy-title: #3730a3;
+      --text-analogy-body: #1e1b4b;
+      --bg-trap: #fff1f2;
+      --border-trap: #fecdd3;
+      --text-trap-title: #be123c;
+      --text-trap-body: #881337;
+      --border-main: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --code-inline: #b45309;
+      --bg-code-inline: #fef3c7;
+    }
+    html[data-theme="dark"] {
+      --bg-page: #020617;
+      --bg-header: rgba(15, 23, 42, 0.95);
+      --bg-card: #0f172a;
+      --bg-subtle: #1e293b;
+      --bg-analogy: rgba(30, 27, 75, 0.7);
+      --border-analogy: rgba(99, 102, 241, 0.4);
+      --text-analogy-title: #a5b4fc;
+      --text-analogy-body: #e0e7ff;
+      --bg-trap: rgba(76, 5, 25, 0.4);
+      --border-trap: rgba(244, 63, 94, 0.4);
+      --text-trap-title: #fda4af;
+      --text-trap-body: #fecdd3;
+      --border-main: #1e293b;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --code-inline: #fcd34d;
+      --bg-code-inline: rgba(251, 191, 36, 0.12);
+    }
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .theme-header {
+      background-color: var(--bg-header);
+      border-color: var(--border-main);
+    }
+    .theme-card {
+      background-color: var(--bg-card);
+      border-color: var(--border-main);
+      color: var(--text-primary);
+    }
+    .theme-subtle {
+      background-color: var(--bg-subtle);
+      border-color: var(--border-main);
+      color: var(--text-primary);
+    }
+    .theme-text-muted {
+      color: var(--text-secondary);
+    }
+    .theme-analogy {
+      background-color: var(--bg-analogy);
+      border-color: var(--border-analogy);
+    }
+    .theme-analogy-title {
+      color: var(--text-analogy-title);
+    }
+    .theme-analogy-body {
+      color: var(--text-analogy-body);
+    }
+    .theme-trap {
+      background-color: var(--bg-trap);
+      border-color: var(--border-trap);
+    }
+    .theme-trap-title {
+      color: var(--text-trap-title);
+    }
+    .theme-trap-body {
+      color: var(--text-trap-body);
+    }
+    .theme-code-badge {
+      color: var(--code-inline);
+      background-color: var(--bg-code-inline);
+    }
+  </style>
+</head>
+<body class="antialiased min-h-screen">
+
+  <!-- Barra Superior -->
+  <header class="sticky top-0 z-30 theme-header backdrop-blur border-b px-4 py-3 shadow-sm">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-blue-600 flex items-center justify-center font-black text-white text-lg shadow">
+          Q
+        </div>
+        <div>
+          <h1 class="font-bold text-base sm:text-lg leading-tight">Academia Interactiva EX378 (Quarkus 3.8)</h1>
+          <p class="text-xs theme-text-muted">Memorizador Intensivo de Anotaciones + ¿Cuándo Usarlas? + Test Infinito</p>
+        </div>
+      </div>
+
+      <!-- Estadísticas de Progreso y Botón Modo Claro / Oscuro -->
+      <div class="flex flex-wrap items-center gap-2 sm:gap-2.5 text-xs">
+        <button id="theme-toggle-btn" onclick="window.toggleTheme()"
+          class="px-3 py-1.5 rounded-xl theme-subtle border font-bold hover:opacity-80 transition-all flex items-center gap-1.5 shadow-sm"
+          title="Cambiar entre Modo Claro y Modo Oscuro">
+          <span id="theme-toggle-icon">🌙</span>
+          <span id="theme-toggle-label">Modo Oscuro</span>
+        </button>
+
+        <div class="px-3 py-1.5 rounded-xl theme-subtle border">
+          <span class="theme-text-muted">Puntos:</span>
+          <span id="stat-xp" class="font-bold text-amber-600 dark:text-amber-400 ml-1">0 XP</span>
+        </div>
+        <div class="px-3 py-1.5 rounded-xl theme-subtle border">
+          <span class="theme-text-muted">Racha:</span>
+          <span id="stat-streak" class="font-bold text-orange-500 ml-1">0 🔥</span>
+        </div>
+        <div class="px-3 py-1.5 rounded-xl theme-subtle border">
+          <span class="theme-text-muted">Precisión:</span>
+          <span id="stat-accuracy" class="font-bold text-emerald-600 ml-1">0%</span>
+        </div>
+        <button onclick="window.onQuizFilterChange('wrong'); window.switchTab('quiz');"
+          class="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-600 font-semibold transition-all"
+          title="Haz clic para repasar solo las preguntas que has fallado">
+          🔁 Falladas: <span id="stat-wrong-count" class="font-bold">0</span>
+        </button>
+        <button onclick="window.resetTrainerProgress()"
+          class="px-2.5 py-1.5 rounded-xl theme-subtle hover:opacity-80 border"
+          title="Reiniciar progreso">
+          ↺
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal -->
+  <main class="max-w-7xl mx-auto px-4 py-6">
+
+    <!-- Pestañas de Navegación -->
+    <div class="flex flex-wrap items-center gap-2 mb-6">
+      <button id="tab-btn-study" onclick="window.switchTab('study')"
+        class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-blue-600 text-white shadow-md transition-all flex items-center gap-2">
+        <span>📚</span> 1. Estudiar Temas y Anotaciones
+      </button>
+      <button id="tab-btn-quiz" onclick="window.switchTab('quiz')"
+        class="px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm theme-card border hover:opacity-90 transition-all flex items-center gap-2">
+        <span>♾️</span> 2. Entrenador Infinito (400+ Retos de Anotaciones)
+        <span id="nav-wrong-badge" style="display:none" class="px-2 py-0.5 text-xs rounded-full bg-rose-600 text-white font-bold">0</span>
+      </button>
+      <button id="tab-btn-flashcards" onclick="window.switchTab('flashcards')"
+        class="px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm theme-card border hover:opacity-90 transition-all flex items-center gap-2">
+        <span>🃏</span> 3. Diccionario & Flashcards: ¿Cuándo Usar Cada Anotación?
+      </button>
+    </div>
+
+    <!-- PESTAÑA 1: ESTUDIAR TEMAS -->
+    <section id="tab-section-study" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <aside class="lg:col-span-4 space-y-2.5">
+        <div class="px-1 pb-1 flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider theme-text-muted">Los 11 Objetivos de tu Examen</h2>
+          <span class="text-xs theme-text-muted">Intento 1 vs Dominio</span>
+        </div>
+        <div id="study-module-list" class="space-y-2"></div>
+      </aside>
+      <div id="study-detail-content" class="lg:col-span-8"></div>
+    </section>
+
+    <!-- PESTAÑA 2: ENTRENADOR INFINITO -->
+    <section id="tab-section-quiz" class="hidden max-w-4xl mx-auto">
+      <div class="theme-card border rounded-2xl p-4 mb-5 space-y-3 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">
+              🧠 Entrenador de Memoria Muscular para EX378
+            </span>
+            <p class="text-xs theme-text-muted">
+              Si fallas una anotación o pregunta, entra en tu <strong>Cola de Repetición</strong> y vuelve a salir cada 2 turnos hasta que la aciertes <strong>2 veces seguidas</strong>.
+            </p>
+          </div>
+          <span id="quiz-pool-counter" class="text-xs font-bold px-3 py-1 rounded-full theme-subtle border shrink-0"></span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
+          <div class="sm:col-span-6">
+            <label for="quiz-filter-select" class="block text-xs font-semibold theme-text-muted mb-1">Filtrar por Objetivo del Examen:</label>
+            <select id="quiz-filter-select" onchange="window.onQuizFilterChange(this.value)"
+              class="w-full theme-subtle border text-xs sm:text-sm rounded-xl px-3 py-2 font-semibold focus:outline-none focus:border-blue-500">
+            </select>
+          </div>
+          <div class="sm:col-span-5">
+            <label for="quiz-mode-select" class="block text-xs font-semibold theme-text-muted mb-1">Enfoque de Preguntas:</label>
+            <select id="quiz-mode-select" onchange="window.onQuizModeChange(this.value)"
+              class="w-full theme-subtle border text-xs sm:text-sm rounded-xl px-3 py-2 font-semibold focus:outline-none focus:border-blue-500">
+              <option value="all-types">🎯 Todo (Sintaxis + ¿Cuándo usarla? + Código)</option>
+              <option value="annotation">🏷️ Solo Anotaciones (Sintaxis Exacta y Huecos en Código)</option>
+              <option value="when">🧭 Solo ¿Cuándo Usar Qué Anotación y Dónde Ponerla?</option>
+              <option value="code">💻 Solo Comportamiento, Propiedades y APIs</option>
+            </select>
+          </div>
+          <div class="sm:col-span-1 flex items-end">
+            <button onclick="window.nextQuestion()"
+              class="w-full px-3 py-2 rounded-xl theme-subtle hover:opacity-80 border text-xs font-bold"
+              title="Saltar a otra pregunta">
+              ⏭️
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="theme-card border rounded-2xl p-6 shadow-md">
+        <div id="quiz-question-badges" class="flex flex-wrap items-center gap-2 mb-4"></div>
+        <h2 id="quiz-question-text" class="text-base sm:text-lg font-bold mb-4 leading-snug"></h2>
+        <pre id="quiz-question-code" class="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-5 text-xs sm:text-sm text-amber-300 font-mono overflow-x-auto leading-relaxed"><code></code></pre>
+        <div id="quiz-options-list" class="space-y-3"></div>
+        <div id="quiz-feedback-box" class="hidden"></div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA 3: DICCIONARIO & FLASHCARDS DE ANOTACIONES -->
+    <section id="tab-section-flashcards" class="hidden max-w-6xl mx-auto space-y-6">
+
+      <!-- Barra de control de Pestaña 3 -->
+      <div class="theme-card border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="subtab-btn-cards" onclick="window.switchAnnotationView('cards')"
+            class="px-4 py-2 rounded-xl font-bold text-xs sm:text-sm bg-indigo-600 text-white shadow transition-all">
+            🃏 Modo Tarjetas (Flashcards de Memoria)
+          </button>
+          <button id="subtab-btn-table" onclick="window.switchAnnotationView('table')"
+            class="px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm theme-subtle border hover:opacity-85 transition-all">
+            📋 Tabla Completa: "¿Cuándo Usar Cada Anotación?"
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <select id="fc-topic-filter" onchange="window.onAnnotationTopicFilter(this.value)"
+            class="theme-subtle border text-xs sm:text-sm rounded-xl px-3 py-2 font-semibold focus:outline-none focus:border-blue-500">
+          </select>
+        </div>
+      </div>
+
+      <!-- SUB-VISTA A: TARJETAS FLASHCARDS ENRIQUECIDAS -->
+      <div id="annotation-view-cards" class="max-w-3xl mx-auto">
+        <div class="theme-card border rounded-2xl p-6 shadow-md">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs theme-text-muted mb-4">
+            <span id="fc-module" class="px-3 py-1 rounded-full bg-blue-500/15 text-blue-600 font-bold"></span>
+            <span id="fc-where-badge" class="px-3 py-1 rounded-full theme-subtle border font-semibold"></span>
+            <span id="fc-counter" class="font-mono font-bold"></span>
+          </div>
+
+          <div class="py-5 px-2 text-center">
+            <p class="text-xs uppercase tracking-wider text-indigo-600 font-bold mb-2">
+              🧭 ¿Cuándo estás en el examen y necesitas hacer esto...?
+            </p>
+            <h3 id="fc-prompt" class="text-base sm:text-xl font-bold mb-5 leading-snug"></h3>
+
+            <button onclick="window.toggleFlashcard()"
+              class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md transition-all">
+              👀 Mostrar / Ocultar Anotación Exacta y Ejemplo
+            </button>
+
+            <div id="fc-answer-container" class="hidden mt-6 text-left space-y-3">
+              <div class="p-4 rounded-xl bg-slate-900 border border-emerald-500/50">
+                <p class="text-xs text-emerald-400 font-bold uppercase mb-1">✅ Anotación / Sintaxis Exacta:</p>
+                <code id="fc-answer" class="text-sm sm:text-base font-mono text-emerald-300 font-bold break-words"></code>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="p-3.5 rounded-xl theme-subtle border text-xs sm:text-sm">
+                  <span class="font-bold block mb-1 text-blue-600">📍 ¿Dónde se coloca?</span>
+                  <span id="fc-where-detail"></span>
+                </div>
+                <div class="p-3.5 rounded-xl theme-subtle border text-xs sm:text-sm">
+                  <span class="font-bold block mb-1 text-blue-600">⚙️ Atributos a recordar:</span>
+                  <span id="fc-attributes-detail"></span>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl theme-trap border text-xs sm:text-sm theme-trap-body">
+                <strong>⚠️ Trampa / No confundir con:</strong> <span id="fc-trap-detail"></span>
+              </div>
+
+              <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+                <span class="text-xs text-slate-400 font-semibold block mb-1">💻 Ejemplo real en código:</span>
+                <pre class="text-xs sm:text-sm text-amber-300 font-mono overflow-x-auto"><code id="fc-example-code"></code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between border-t border-slate-200/30 pt-4 mt-4">
+            <button onclick="window.nextFlashcard(-1)"
+              class="px-4 py-2 rounded-xl theme-subtle border hover:opacity-80 text-xs sm:text-sm font-semibold">
+              ⬅ Anterior
+            </button>
+            <button onclick="window.nextFlashcard(1)"
+              class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs sm:text-sm font-bold text-white shadow">
+              Siguiente Tarjeta ➔
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-VISTA B: BUSCADOR Y TABLA COMPLETA DE ANOTACIONES -->
+      <div id="annotation-view-table" class="hidden space-y-4">
+        <div class="theme-card border rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="w-full sm:w-2/3">
+            <input id="annotation-search-input" type="text" oninput="window.renderAnnotationTable()"
+              placeholder="🔍 Buscar anotación o caso de uso (ej. @WithDefault, @Channel, @RestClient, header, transacción, rol...)"
+              class="w-full theme-subtle border rounded-xl px-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:border-blue-500" />
+          </div>
+          <span id="annotation-table-count" class="text-xs font-bold theme-text-muted shrink-0"></span>
+        </div>
+
+        <div id="annotation-dictionary-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="study-content.js"></script>
+  <script src="questions.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
