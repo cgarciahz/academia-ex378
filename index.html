@@ -134,6 +134,11 @@
           title="Haz clic para repasar solo las preguntas que has fallado">
           🔁 Falladas: <span id="stat-wrong-count" class="font-bold">0</span>
         </button>
+        <button id="sync-btn" onclick="window.configureCloudSync()"
+          class="px-3 py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/40 text-indigo-600 font-semibold transition-all"
+          title="Sincronizar progreso entre teléfono, laptop y desktop sin login">
+          ☁️ <span id="sync-status-label">Sync</span>
+        </button>
         <button onclick="window.resetTrainerProgress()"
           class="px-2.5 py-1.5 rounded-xl theme-subtle hover:opacity-80 border"
           title="Reiniciar progreso">

@@ -1,6 +1,9 @@
 // Lógica Principal de Academia EX378: Estudio + Entrenador Infinito de Anotaciones + Modo Claro/Oscuro
 (function () {
   const STORAGE_KEY = "ex378_trainer_state_v3";
+  const SYNC_CODE_KEY = "ex378_sync_code_v1";
+  let syncSaveTimer = null;
+  let syncStatus = "";
 
   const defaultState = {
     theme: "light", // Por defecto inicia en Modo Claro
@@ -36,10 +39,112 @@
     }
   }
 
+  function sanitizeSyncCode(raw) {
+    if (!raw) return "";
+    const cleaned = String(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    return cleaned.length >= 3 && cleaned.length <= 64 ? cleaned : "";
+  }
+
+  function getSyncCode() {
+    try {
+      return sanitizeSyncCode(localStorage.getItem(SYNC_CODE_KEY));
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function setSyncCode(code) {
+    const clean = sanitizeSyncCode(code);
+    try {
+      if (clean) localStorage.setItem(SYNC_CODE_KEY, clean);
+      else localStorage.removeItem(SYNC_CODE_KEY);
+    } catch (e) {}
+    return clean;
+  }
+
+  function updateSyncBadge(label) {
+    const el = document.getElementById("sync-status-label");
+    if (!el) return;
+    const code = getSyncCode();
+    if (!code) {
+      el.textContent = "Sync";
+      return;
+    }
+    el.textContent = label || `${code} ✓`;
+  }
+
+  async function pushCloudState() {
+    const code = getSyncCode();
+    if (!code) return;
+    updateSyncBadge(`${code} ...`);
+    try {
+      const res = await fetch(`/api/progress?code=${encodeURIComponent(code)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state })
+      });
+      if (res.ok) {
+        updateSyncBadge(`${code} ✓`);
+      } else {
+        updateSyncBadge(`${code} !`);
+      }
+    } catch (e) {
+      updateSyncBadge(`${code} (offline)`);
+    }
+  }
+
+  async function pullCloudState(forceReplace) {
+    const code = getSyncCode();
+    if (!code) {
+      updateSyncBadge();
+      return;
+    }
+    updateSyncBadge(`${code} ...`);
+    try {
+      const res = await fetch(`/api/progress?code=${encodeURIComponent(code)}`);
+      if (res.status === 404) {
+        if (state.totalAnswered > 0) {
+          await pushCloudState();
+        } else {
+          updateSyncBadge(`${code} ✓`);
+        }
+        return;
+      }
+      if (!res.ok) {
+        updateSyncBadge(`${code} !`);
+        return;
+      }
+      const data = await res.json();
+      if (data && data.state) {
+        const cloudAnswered = data.state.totalAnswered || 0;
+        if (forceReplace || cloudAnswered >= (state.totalAnswered || 0)) {
+          state = Object.assign(JSON.parse(JSON.stringify(defaultState)), data.state);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          applyTheme();
+          renderTopStats();
+          renderStudySidebar();
+          renderStudyDetail();
+          loadNextQuizQuestion();
+        } else if (state.totalAnswered > cloudAnswered) {
+          await pushCloudState();
+        }
+      }
+      updateSyncBadge(`${code} ✓`);
+    } catch (e) {
+      updateSyncBadge(`${code} (offline)`);
+    }
+  }
+
   function saveState() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {}
+    const code = getSyncCode();
+    if (code) {
+      updateSyncBadge(`${code} ...`);
+      clearTimeout(syncSaveTimer);
+      syncSaveTimer = setTimeout(pushCloudState, 600);
+    }
   }
 
   function applyTheme() {
@@ -736,7 +841,34 @@
     loadNextQuizQuestion();
   };
 
+  window.configureCloudSync = function () {
+    const current = getSyncCode();
+    const shareUrl = current ? `${location.origin}${location.pathname}?sync=${current}` : "";
+    const msg = current
+      ? `Código actual: ${current}\n\nPara abrir en tu teléfono/laptop/desktop usa:\n${shareUrl}\n\nEscribe un nuevo código (mín. 3 caracteres, o déjalo vacío para desconectar):`
+      : `Escribe un código personal para guardar y sincronizar tu progreso en la nube sin login (ej. carlos-ex378):`;
+    const input = window.prompt(msg, current || "carlos-ex378");
+    if (input === null) return;
+    const clean = setSyncCode(input);
+    if (!clean) {
+      updateSyncBadge();
+      const url = new URL(location.href);
+      url.searchParams.delete("sync");
+      history.replaceState(null, "", url.toString());
+      return;
+    }
+    const url = new URL(location.href);
+    url.searchParams.set("sync", clean);
+    history.replaceState(null, "", url.toString());
+    pullCloudState(true);
+  };
+
   window.addEventListener("DOMContentLoaded", function () {
+    const params = new URLSearchParams(location.search);
+    const urlSync = sanitizeSyncCode(params.get("sync"));
+    if (urlSync) {
+      setSyncCode(urlSync);
+    }
     applyTheme();
     renderTopStats();
     renderStudySidebar();
@@ -744,5 +876,9 @@
     loadNextQuizQuestion();
     renderFlashcard();
     window.renderAnnotationTable();
+    updateSyncBadge();
+    if (getSyncCode()) {
+      pullCloudState(Boolean(urlSync));
+    }
   });
 })();
