@@ -5338,3 +5338,1236 @@ public class TickerGenerator {
     kidTip: "Solo @Outgoing = Fuente | Solo @Incoming = Consumidor | @Incoming + @Outgoing juntos = Procesador transformador."
   }
 );
+
+// ============================================================================
+// PREGUNTAS PRÁCTICAS ORIENTADAS A OBJETIVOS EX378 (Búsquedas, Filtros, Código)
+// ============================================================================
+window.QUESTION_BANK.push(
+  // --- PANACHE: BÚSQUEDAS, FILTROS, PAGINACIÓN, UPDATES (12) ---
+  {
+    id: "pan-prac-1",
+    module: "panache",
+    category: "code",
+    question: "En Panache Active Record (`Order extends PanacheEntity`), ¿cómo buscas todos los pedidos cuyo campo `status` sea exactamente `\"PAID\"`?",
+    code: `public List<Order> findPaidOrders() {
+    // TODO: retornar pedidos con status = "PAID"
+}`,
+    options: [
+      "return Order.find(\"status\", \"PAID\").list();",
+      "return Order.findBy(\"status\", \"PAID\");",
+      "return Order.where(\"status = 'PAID'\").all();",
+      "return Order.list(\"status\", \"PAID\");"
+    ],
+    correct: 0,
+    explanation: "Con Panache, `find(\"campo\", valor)` devuelve un `PanacheQuery<T>`. Encadenando `.list()` obtienes `List<Order>`. También existe el atajo `Order.list(\"status\", \"PAID\")`? Ojo: `Order.list(\"status\", \"PAID\")` SÍ existe en Panache, pero en `find(\"status\", \"PAID\").list()` es la forma estándar sobre `PanacheQuery` (que además permite `.page()`, `.firstResult()`, etc.).",
+    kidTip: "Si solo pasas un campo y un valor a `find(\"campo\", valor).list()`, Panache genera automáticamente `WHERE campo = ?1`."
+  },
+  {
+    id: "pan-prac-2",
+    module: "panache",
+    category: "code",
+    question: "Necesitas filtrar productos en Panache donde `category` sea igual a un parámetro Y `price` sea menor o igual al máximo indicado. ¿Cuál es la sintaxis correcta con parámetros posicionales?",
+    code: `public List<Product> search(String category, double maxPrice) {
+    // TODO: filtrar por category = ?1 y price <= ?2
+}`,
+    options: [
+      "return Product.find(\"category = ?1 and price <= ?2\", category, maxPrice).list();",
+      "return Product.find(\"category = :1 and price <= :2\", category, maxPrice).list();",
+      "return Product.find(\"category = ? and price <= ?\", category, maxPrice).list();",
+      "return Product.filter(\"category = ?1 && price <= ?2\", category, maxPrice).list();"
+    ],
+    correct: 0,
+    explanation: "Panache usa HQL/JPQL simplificado: los parámetros posicionales se escriben `?1`, `?2`, etc. (base 1, nunca `?` ni `:1`) y el operador lógico es `and` (no `&&`).",
+    kidTip: "En Panache los huecos posicionales SIEMPRE empiezan en `?1`, `?2`, `?3` y las palabras lógicas son `and` / `or`."
+  },
+  {
+    id: "pan-prac-3",
+    module: "panache",
+    category: "code",
+    question: "Quieres usar parámetros nombrados (`:min` y `:cat`) en una consulta Panache para que sea más legible. ¿Qué clase auxiliar de Panache se usa para pasar los valores?",
+    code: `List<Product> items = Product.find(
+    "category = :cat and price >= :min",
+    /* TODO: pasar parámetros nombrados */
+).list();`,
+    options: [
+      "Parameters.with(\"cat\", cat).and(\"min\", min)",
+      "Params.of(\"cat\", cat, \"min\", min)",
+      "QueryParams.add(\"cat\", cat).add(\"min\", min)",
+      "Map.entry(\"cat\", cat)"
+    ],
+    correct: 0,
+    explanation: "`io.quarkus.panache.common.Parameters` permite construir parámetros nombrados de forma fluida: `Parameters.with(\"cat\", cat).and(\"min\", min)` (también acepta un `Map<String, Object>`).",
+    kidTip: "Para `:nombre` en Panache, recuerda `Parameters.with(\"nombre\", valor).and(\"otro\", valor2)`."
+  },
+  {
+    id: "pan-prac-4",
+    module: "panache",
+    category: "code",
+    question: "Debes implementar una búsqueda de texto parcial (contiene `term`, sin importar mayúsculas/minúsculas) sobre el campo `name` en Panache. ¿Cuál es la forma correcta?",
+    code: `public List<Speaker> searchByName(String term) {
+    // TODO: búsqueda LIKE case-insensitive
+}`,
+    options: [
+      "return Speaker.find(\"lower(name) like ?1\", \"%\" + term.toLowerCase() + \"%\").list();",
+      "return Speaker.find(\"name contains ?1\", term).list();",
+      "return Speaker.find(\"name ilike '%?1%'\", term).list();",
+      "return Speaker.find(\"name like %?1%\", term).list();"
+    ],
+    correct: 0,
+    explanation: "En JPQL/Panache, los comodines `%` se concatenan en el argumento Java (`\"%\" + term.toLowerCase() + \"%\"`), nunca dentro de la cadena HQL alrededor de `?1`, y `lower(name)` asegura case-insensitivity estándar.",
+    kidTip: "Los `%` del LIKE van en el valor del parámetro en Java, NO escritos alrededor de `?1` en la consulta."
+  },
+  {
+    id: "pan-prac-5",
+    module: "panache",
+    category: "code",
+    question: "En un endpoint `GET /books/{id}`, quieres buscar por ID usando Panache y lanzar automáticamente un HTTP 404 (`NotFoundException`) si no existe. ¿Cuál es el patrón más limpio?",
+    code: `@GET
+@Path("/{id}")
+public Book getById(@PathParam("id") Long id) {
+    // TODO: buscar por id o lanzar 404
+}`,
+    options: [
+      "return (Book) Book.findByIdOptional(id).orElseThrow(NotFoundException::new);",
+      "return Book.findById(id).orElseThrow();",
+      "return Book.getOr404(id);",
+      "return Book.find(\"id\", id).singleResult();"
+    ],
+    correct: 0,
+    explanation: "`findByIdOptional(id)` devuelve `Optional<PanacheEntityBase>` (en Active Record suele hacerse cast `(Book)` o usar `Book.<Book>findByIdOptional(id)`), permitiendo encadenar `.orElseThrow(NotFoundException::new)`, que Jakarta REST convierte en 404.",
+    kidTip: "`findByIdOptional(id).orElseThrow(NotFoundException::new)` es el combo rey para `GET /{id}` en el examen."
+  },
+  {
+    id: "pan-prac-6",
+    module: "panache",
+    category: "code",
+    question: "Quieres obtener todos los empleados ordenados primero por `salary` descendente y luego por `lastName` ascendente usando Panache. ¿Cómo construyes el `Sort`?",
+    code: `List<Employee> list = Employee.findAll(
+    /* TODO: ordenar por salary DESC y lastName ASC */
+).list();`,
+    options: [
+      "Sort.by(\"salary\").descending().and(\"lastName\").ascending()",
+      "Sort.desc(\"salary\").asc(\"lastName\")",
+      "OrderBy.of(\"salary DESC, lastName ASC\")",
+      "Sort.by(\"salary\", Direction.DESC).then(\"lastName\")"
+    ],
+    correct: 0,
+    explanation: "`io.quarkus.panache.common.Sort` usa el patrón fluido `Sort.by(\"campo1\").descending().and(\"campo2\").ascending()` (por defecto `.by(...)` es ascendente).",
+    kidTip: "`Sort.by(\"campo\").descending().and(\"otro\").ascending()` — fácil de recordar leyendo en inglés."
+  },
+  {
+    id: "pan-prac-7",
+    module: "panache",
+    category: "code",
+    question: "Tienes una búsqueda paginada en Panache y necesitas tanto los elementos de la página `pageIndex` (tamaño `pageSize`) como saber cuántas páginas totales hay. ¿Qué métodos de `PanacheQuery` usas?",
+    code: `PanacheQuery<Book> query = Book.find("active", true)
+    .page(Page.of(pageIndex, pageSize));
+List<Book> items = query.list();
+int totalPages = /* TODO */;`,
+    options: [
+      "query.pageCount()",
+      "query.totalPages()",
+      "query.pages()",
+      "Page.count(query)"
+    ],
+    correct: 0,
+    explanation: "Sobre `PanacheQuery`, `.page(Page.of(index, size))` (con índice base 0) configura la paginación, `.list()` trae los registros de esa página, `.pageCount()` devuelve el total de páginas y `.count()` el total de filas.",
+    kidTip: "Índice de página en `Page.of(0, 10)` empieza en 0; `query.pageCount()` te da el total de páginas y `query.count()` el total de registros."
+  },
+  {
+    id: "pan-prac-8",
+    module: "panache",
+    category: "code",
+    question: "Necesitas actualizar masivamente en base de datos el `status` a `\"EXPIRED\"` de todas las suscripciones donde `active = false`, dentro de un método `@Transactional`. ¿Qué método de Panache lo hace en una sola sentencia?",
+    code: `@Transactional
+public long expireInactive() {
+    // TODO: actualizar status = 'EXPIRED' donde active = false
+}`,
+    options: [
+      "return Subscription.update(\"status = ?1 where active = ?2\", \"EXPIRED\", false);",
+      "return Subscription.find(\"active\", false).update(\"status\", \"EXPIRED\");",
+      "return Subscription.bulkUpdate(\"status\", \"EXPIRED\", \"active = false\");",
+      "return Subscription.set(\"status = 'EXPIRED'\").where(\"active = false\");"
+    ],
+    correct: 0,
+    explanation: "`PanacheEntity.update(\"campo = ?1 where condicion = ?2\", val1, val2)` ejecuta un `UPDATE` masivo en JPQL y devuelve el número de filas afectadas (`long`).",
+    kidTip: "Para UPDATE masivo usa `Entidad.update(\"setCampo = ?1 where condicion\", ...)` dentro de `@Transactional`."
+  },
+  {
+    id: "pan-prac-9",
+    module: "panache",
+    category: "code",
+    question: "¿Cómo eliminas todas las tareas con `status = \"DONE\"` usando Panache dentro de un método `@Transactional`?",
+    code: `@Transactional
+public long cleanDoneTasks() {
+    // TODO: eliminar tareas con status = "DONE"
+}`,
+    options: [
+      "return Task.delete(\"status\", \"DONE\");",
+      "return Task.remove(\"status = 'DONE'\");",
+      "return Task.find(\"status\", \"DONE\").delete();",
+      "return Task.deleteAll(\"status = ?1\", \"DONE\");"
+    ],
+    correct: 0,
+    explanation: "`Task.delete(\"status\", \"DONE\")` (o `Task.delete(\"status = ?1\", \"DONE\")`) ejecuta un `DELETE` directo y retorna la cantidad de registros eliminados (`long`).",
+    kidTip: "`Entidad.delete(\"campo\", valor)` borra y devuelve cuántas filas eliminó."
+  },
+  {
+    id: "pan-prac-10",
+    module: "panache",
+    category: "code",
+    question: "En un método `@PUT` anotado con `@Transactional`, buscas una entidad existente con `findById(id)` y modificas sus campos (`entity.name = dto.name;`). ¿Es necesario llamar a `entity.persist()`?",
+    code: `@PUT
+@Path("/{id}")
+@Transactional
+public Book update(@PathParam("id") Long id, Book input) {
+    Book entity = Book.findById(id);
+    if (entity == null) throw new NotFoundException();
+    entity.title = input.title;
+    // ¿Hace falta entity.persist()?
+    return entity;
+}`,
+    options: [
+      "No hace falta; al estar dentro de @Transactional, la entidad está gestionada (managed) y Hibernate guarda los cambios al hacer commit (dirty checking)",
+      "Sí, obligatorio llamar a entity.persist() o no se guarda nada",
+      "Hay que llamar a Book.merge(entity)",
+      "Solo se guarda si llamas a entity.flush()"
+    ],
+    correct: 0,
+    explanation: "En JPA/Hibernate dentro de `@Transactional`, cualquier entidad recuperada de la BD está en estado *managed*. Al terminar la transacción, Hibernate detecta los cambios (dirty checking) y ejecuta el `UPDATE` automáticamente.",
+    kidTip: "Modificar una entidad buscada dentro de `@Transactional` la actualiza sola al salir del método; `persist()` es solo para entidades nuevas."
+  },
+  {
+    id: "pan-prac-11",
+    module: "panache",
+    category: "code",
+    question: "Quieres que una consulta Panache devuelva directamente un DTO (`BookSummary`) sin cargar todas las columnas de la entidad `Book`. ¿Qué método de `PanacheQuery` usas?",
+    code: `public List<BookSummary> getSummaries() {
+    return Book.findAll()
+        /* TODO: proyectar al DTO BookSummary */
+        .list();
+}`,
+    options: [
+      ".project(BookSummary.class)",
+      ".as(BookSummary.class)",
+      ".mapTo(BookSummary.class)",
+      ".select(BookSummary.class)"
+    ],
+    correct: 0,
+    explanation: "`.project(BookSummary.class)` le indica a Panache que proyecte solo los campos que coinciden con el constructor del DTO `BookSummary` (que debe tener un constructor con esos parámetros y es buena práctica anotarlo con `@RegisterForReflection`).",
+    kidTip: "Para devolver DTOs directo desde Panache: `.project(MiDto.class).list()`."
+  },
+  {
+    id: "pan-prac-12",
+    module: "panache",
+    category: "code",
+    question: "Tu entidad `Invoice` tiene clave primaria de tipo `UUID` (no `Long`). Si usas el patrón Repository, ¿qué interfaz debe implementar `InvoiceRepository`?",
+    code: `@ApplicationScoped
+public class InvoiceRepository implements /* TODO */ {
+}`,
+    options: [
+      "PanacheRepositoryBase<Invoice, UUID>",
+      "PanacheRepository<Invoice, UUID>",
+      "PanacheEntityBase<Invoice, UUID>",
+      "CrudRepository<Invoice, UUID>"
+    ],
+    correct: 0,
+    explanation: "`PanacheRepository<T>` asume ID de tipo `Long`. Cuando el ID es otro tipo (`UUID`, `String`, etc.), debes implementar `PanacheRepositoryBase<Entidad, TipoId>`.",
+    kidTip: "`PanacheRepository<T>` = ID `Long`. `PanacheRepositoryBase<T, ID>` = cualquier tipo de ID (como `UUID` o `String`)."
+  },
+
+  // --- RESTEASY REACTIVE & JAKARTA REST (8) ---
+  {
+    id: "rest-prac-1",
+    module: "rest",
+    category: "code",
+    question: "En un endpoint `@POST`, quieres crear un recurso `Book`, guardar en BD y retornar código HTTP `201 Created` con el header `Location` apuntando al nuevo recurso y el objeto creado en el body. ¿Cuál es la forma correcta?",
+    code: `@POST
+@Transactional
+public Response create(Book book, @Context UriInfo uriInfo) {
+    book.persist();
+    // TODO: retornar 201 Created con Location y body
+}`,
+    options: [
+      "URI uri = uriInfo.getAbsolutePathBuilder().path(book.id.toString()).build();\nreturn Response.created(uri).entity(book).build();",
+      "return Response.ok(book).status(201).build();",
+      "return Response.status(201).location(book.id.toString()).build();",
+      "return Response.created(book).build();"
+    ],
+    correct: 0,
+    explanation: "`Response.created(URI)` establece el status `201` y el header `Location`. Con `uriInfo.getAbsolutePathBuilder().path(...).build()` construyes la URI absoluta del nuevo recurso y `.entity(book)` añade el JSON al cuerpo.",
+    kidTip: "`Response.created(uri).entity(obj).build()` = 201 + header Location + body JSON."
+  },
+  {
+    id: "rest-prac-2",
+    module: "rest",
+    category: "code",
+    question: "Quieres implementar `GET /items?page=0&size=20` donde `page` y `size` sean opcionales con valores por defecto `0` y `20`. ¿Cómo declaras los parámetros?",
+    code: `@GET
+public List<Item> list(
+    /* TODO: query params con default */
+) { ... }`,
+    options: [
+      "@QueryParam(\"page\") @DefaultValue(\"0\") int page, @QueryParam(\"size\") @DefaultValue(\"20\") int size",
+      "@RequestParam(defaultValue = \"0\") int page, @RequestParam(defaultValue = \"20\") int size",
+      "@QueryParam(value = \"page\", defaultValue = \"0\") int page",
+      "@PathParam(\"page\") @WithDefault(\"0\") int page"
+    ],
+    correct: 0,
+    explanation: "En Jakarta REST se combina `@QueryParam(\"nombre\")` con `@DefaultValue(\"valor\")` (siempre String). `@RequestParam` es de Spring y `@WithDefault` es de `@ConfigMapping`.",
+    kidTip: "En endpoints REST: `@QueryParam` + `@DefaultValue(\"...\")`."
+  },
+  {
+    id: "rest-prac-3",
+    module: "rest",
+    category: "code",
+    question: "Tienes un DTO `CreateUserDto` con `@NotBlank String email;`. ¿Qué anotación debes poner en el parámetro del método `@POST` para que Quarkus valide automáticamente el JSON y devuelva `400 Bad Request` si es inválido?",
+    code: `@POST
+public Response create(/* TODO */ CreateUserDto dto) {
+    ...
+}`,
+    options: [
+      "@Valid",
+      "@Validated",
+      "@Check",
+      "@NotNull"
+    ],
+    correct: 0,
+    explanation: "La anotación estándar de Jakarta Bean Validation en el parámetro del recurso REST es `@Valid` (de `jakarta.validation.Valid`), junto con la extensión `quarkus-hibernate-validator`.",
+    kidTip: "`@Valid` en el parámetro del método REST activa las validaciones `@NotBlank`, `@NotNull`, `@Min`, etc. del DTO."
+  },
+  {
+    id: "rest-prac-4",
+    module: "rest",
+    category: "code",
+    question: "En RESTEasy Reactive (Quarkus REST), ¿qué anotación simplificada permite convertir un método dentro de una clase (sin implementar `ExceptionMapper<T>`) en un manejador global de excepciones HTTP?",
+    code: `public class GlobalExceptionMapper {
+    /* TODO */
+    public RestResponse<String> mapNotFound(InsufficientFundsException ex) {
+        return RestResponse.status(Response.Status.CONFLICT, ex.getMessage());
+    }
+}`,
+    options: [
+      "@ServerExceptionMapper",
+      "@ExceptionHandler",
+      "@RestExceptionMapper",
+      "@CatchException"
+    ],
+    correct: 0,
+    explanation: "RESTEasy Reactive ofrece `@ServerExceptionMapper` (`org.jboss.resteasy.reactive.server.ServerExceptionMapper`), que evita tener que registrar `@Provider` e implementar `ExceptionMapper<T>`.",
+    kidTip: "`@ServerExceptionMapper` es el atajo moderno de Quarkus REST para mapear excepciones a códigos HTTP."
+  },
+  {
+    id: "rest-prac-5",
+    module: "rest",
+    category: "code",
+    question: "En un endpoint `@DELETE @Path(\"/{id}\")` usando `RestResponse<Void>` (de RESTEasy Reactive), ¿cómo devuelves `204 No Content` si se borró correctamente y `404 Not Found` si no existía?",
+    code: `@DELETE
+@Path("/{id}")
+@Transactional
+public RestResponse<Void> delete(@PathParam("id") Long id) {
+    boolean deleted = Book.deleteById(id);
+    // TODO: 204 si true, 404 si false
+}`,
+    options: [
+      "return deleted ? RestResponse.noContent() : RestResponse.notFound();",
+      "return deleted ? RestResponse.ok() : RestResponse.status(404);",
+      "return deleted ? Response.noContent().build() : Response.status(404).build();",
+      "return RestResponse.deleted(deleted);"
+    ],
+    correct: 0,
+    explanation: "`RestResponse<T>` tiene métodos estáticos tipados muy limpios: `RestResponse.noContent()` (204), `RestResponse.notFound()` (404), `RestResponse.ok(entity)` (200), `RestResponse.created(uri)` (201).",
+    kidTip: "`RestResponse.noContent()` (204) y `RestResponse.notFound()` (404) no necesitan `.build()` al final."
+  },
+  {
+    id: "rest-prac-6",
+    module: "rest",
+    category: "code",
+    question: "Tienes un método REST que retorna `Uni<List<Book>>` pero dentro realiza una llamada bloqueante a JDBC/JPA clásico. ¿Qué anotación debes añadir al método para que Quarkus lo ejecute en un worker thread y no bloquee el event loop?",
+    code: `@GET
+/* TODO: evitar bloquear el event loop */
+public Uni<List<Book>> getBooks() {
+    return Uni.createFrom().item(() -> Book.listAll());
+}`,
+    options: [
+      "@Blocking",
+      "@Transactional",
+      "@Async",
+      "@WorkerThread"
+    ],
+    correct: 0,
+    explanation: "En RESTEasy Reactive, los métodos que retornan `Uni` o `Multi` se ejecutan por defecto en el event loop (no bloqueante). Si hacen I/O bloqueante dentro, debes anotarlos con `@Blocking` (`io.smallrye.common.annotation.Blocking`).",
+    kidTip: "Si ves `Uni<...>` o `@Incoming` haciendo llamadas bloqueantes (JPA/JDBC/sleep), pon `@Blocking`."
+  },
+  {
+    id: "rest-prac-7",
+    module: "rest",
+    category: "code",
+    question: "Quieres leer el header HTTP `X-Correlation-Id` en un método `@GET` de Jakarta REST. ¿Qué anotación usas en el parámetro?",
+    code: `@GET
+public Response check(/* TODO */ String correlationId) { ... }`,
+    options: [
+      "@HeaderParam(\"X-Correlation-Id\")",
+      "@RequestHeader(\"X-Correlation-Id\")",
+      "@HttpHeader(\"X-Correlation-Id\")",
+      "@ClientHeaderParam(name = \"X-Correlation-Id\")"
+    ],
+    correct: 0,
+    explanation: "En el servidor Jakarta REST se usa `@HeaderParam(\"Nombre-Header\")`. `@ClientHeaderParam` es solo para enviar headers en el REST Client.",
+    kidTip: "Servidor REST = `@HeaderParam`. Cliente REST = `@ClientHeaderParam` (o `@HeaderParam` en la interfaz cliente)."
+  },
+  {
+    id: "rest-prac-8",
+    module: "rest",
+    category: "code",
+    question: "Un recurso REST tiene `@Path(\"/api/orders\")` a nivel de clase y un método `@GET @Path(\"/{id}/items\")`. ¿Cuál es la ruta completa final?",
+    code: `@Path("/api/orders")
+public class OrderResource {
+    @GET
+    @Path("/{id}/items")
+    public List<Item> items(@PathParam("id") Long id) { ... }
+}`,
+    options: [
+      "/api/orders/{id}/items",
+      "/{id}/items",
+      "/api/orders/items/{id}",
+      "/orders/{id}/items"
+    ],
+    correct: 0,
+    explanation: "Jakarta REST concatena el `@Path` de la clase con el `@Path` del método.",
+    kidTip: "Las rutas de clase + método siempre se concatenan en orden."
+  },
+
+  // --- REST CLIENT REACTIVE (6) ---
+  {
+    id: "rc-prac-1",
+    module: "restclient",
+    category: "code",
+    question: "Defines una interfaz REST Client para consumir un microservicio externo. ¿Qué par de anotaciones necesitas en la interfaz y en el punto de inyección?",
+    code: `/* 1. En la interfaz */
+@Path("/payments")
+public interface PaymentClient {
+    @POST
+    PaymentResponse pay(PaymentRequest req);
+}
+
+/* 2. En tu servicio */
+@ApplicationScoped
+public class OrderService {
+    /* 2. Inyección */
+    PaymentClient client;
+}`,
+    options: [
+      "1) @RegisterRestClient(configKey = \"payment-api\")   2) @Inject @RestClient",
+      "1) @RestClient   2) @Inject",
+      "1) @RegisterRestClient   2) @Autowired",
+      "1) @PathClient   2) @Inject @Client"
+    ],
+    correct: 0,
+    explanation: "La interfaz lleva `@RegisterRestClient(configKey = \"...\")` (o `baseUri`) y en la clase consumidora se inyecta con `@Inject` + `@RestClient` (`org.eclipse.microprofile.rest.client.inject.RestClient`).",
+    kidTip: "Interfaz = `@RegisterRestClient(...)`. Campo inyectado = `@Inject @RestClient`."
+  },
+  {
+    id: "rc-prac-2",
+    module: "restclient",
+    category: "code",
+    question: "Tu interfaz cliente tiene `@RegisterRestClient(configKey = \"inventory-api\")`. ¿Cómo configuras su URL base en `application.properties` (en Quarkus REST Client Reactive)?",
+    code: `@RegisterRestClient(configKey = "inventory-api")
+public interface InventoryClient { ... }`,
+    options: [
+      "quarkus.rest-client.inventory-api.url=http://localhost:8081",
+      "quarkus.rest-client.inventory-api.endpoint=http://localhost:8081",
+      "mp.rest.client.inventory-api.host=http://localhost:8081",
+      "rest.client.url.inventory-api=http://localhost:8081"
+    ],
+    correct: 0,
+    explanation: "En Quarkus REST Client se usa `quarkus.rest-client.<configKey>.url=...` (o entre comillas `quarkus.rest-client.\"inventory-api\".url=...` si tiene guiones/puntos, aunque sin comillas también funciona para kebab-case).",
+    kidTip: "Propiedad estándar: `quarkus.rest-client.<configKey>.url=http://...`."
+  },
+  {
+    id: "rc-prac-3",
+    module: "restclient",
+    category: "code",
+    question: "Necesitas que todas las llamadas de tu `InventoryClient` envíen automáticamente el header `X-Api-Key` leyendo una propiedad o valor fijo. ¿Qué anotación usas en la interfaz o método?",
+    code: `@RegisterRestClient(configKey = "inventory-api")
+/* TODO: enviar header X-Api-Key = my-secret */
+public interface InventoryClient {
+    @GET @Path("/stock")
+    int getStock();
+}`,
+    options: [
+      "@ClientHeaderParam(name = \"X-Api-Key\", value = \"my-secret\")",
+      "@HeaderParam(\"X-Api-Key\")",
+      "@DefaultHeader(name = \"X-Api-Key\", value = \"my-secret\")",
+      "@AddHeader(\"X-Api-Key: my-secret\")"
+    ],
+    correct: 0,
+    explanation: "`@ClientHeaderParam(name = \"...\", value = \"...\")` añade headers salientes en el REST Client. Incluso acepta expresiones `${propiedad}` o `{metodoCalculo}`.",
+    kidTip: "`@ClientHeaderParam(name = \"...\", value = \"...\")` sirve para inyectar headers fijos, de propiedades o calculados en el cliente REST."
+  },
+  {
+    id: "rc-prac-4",
+    module: "restclient",
+    category: "code",
+    question: "Quieres llamar de forma reactiva y no bloqueante al servicio externo usando REST Client Reactive. ¿Qué tipo de retorno debe tener el método en la interfaz?",
+    code: `@RegisterRestClient(configKey = "catalog-api")
+@Path("/products")
+public interface CatalogClient {
+    @GET @Path("/{id}")
+    /* TODO: retorno reactivo */ getProduct(@PathParam("id") Long id);
+}`,
+    options: [
+      "Uni<Product>",
+      "Optional<Product>",
+      "Mono<Product>",
+      "Stream<Product>"
+    ],
+    correct: 0,
+    explanation: "Quarkus REST Client Reactive usa Mutiny: retorna `Uni<T>` para una respuesta única asíncrona (o `CompletionStage<T>`).",
+    kidTip: "En Quarkus reactivo: 1 elemento = `Uni<T>`, flujo de muchos = `Multi<T>`."
+  },
+  {
+    id: "rc-prac-5",
+    module: "restclient",
+    category: "code",
+    question: "El servicio remoto devuelve `404 Not Found` y quieres que el REST Client lo transforme en tu excepción personalizada `RemoteNotFoundException` sin escribir un `ResponseExceptionMapper` completo. ¿Qué anotación usas en la interfaz cliente?",
+    code: `@RegisterRestClient(configKey = "catalog-api")
+public interface CatalogClient {
+    /* TODO */
+    static RuntimeException toException(Response response) {
+        if (response.getStatus() == 404) return new RemoteNotFoundException();
+        return null;
+    }
+}`,
+    options: [
+      "@ClientExceptionMapper",
+      "@ServerExceptionMapper",
+      "@ResponseErrorHandler",
+      "@ExceptionMapper"
+    ],
+    correct: 0,
+    explanation: "`@ClientExceptionMapper` (`io.quarkus.rest.client.reactive.ClientExceptionMapper`) permite definir un método `static` en la propia interfaz cliente que recibe `Response` y devuelve la excepción (o `null` si no aplica).",
+    kidTip: "Servidor = `@ServerExceptionMapper`. Cliente = `@ClientExceptionMapper`."
+  },
+  {
+    id: "rc-prac-6",
+    module: "restclient",
+    category: "code",
+    question: "¿Qué propiedad en `application.properties` permite propagar headers entrantes (como `Authorization`) desde tu endpoint REST hacia el REST Client saliente?",
+    code: `# En application.properties:
+# TODO: propagar el header Authorization`,
+    options: [
+      "quarkus.rest-client.propagate-headers=Authorization",
+      "quarkus.rest-client.forward-auth=true",
+      "mp.jwt.propagate.headers=Authorization",
+      "quarkus.http.propagate-headers=Authorization"
+    ],
+    correct: 0,
+    explanation: "En Quarkus, `quarkus.rest-client.propagate-headers=Authorization,X-Custom` (o `org.eclipse.microprofile.rest.client.propagateHeaders`) propaga headers de la petición entrante a las llamadas salientes del REST Client (usando `DefaultClientHeadersFactoryImpl` o `@RegisterClientHeaders`).",
+    kidTip: "`quarkus.rest-client.propagate-headers=Authorization` + `@RegisterClientHeaders` en la interfaz cliente."
+  },
+
+  // --- MICROPROFILE FAULT TOLERANCE (6) ---
+  {
+    id: "ft-prac-1",
+    module: "faulttolerance",
+    category: "code",
+    question: "Quieres reintentar una llamada hasta 3 veces esperando 200ms entre intentos, PERO sin reintentar si lanza `IllegalArgumentException`. ¿Cómo configuras `@Retry`?",
+    code: `/* TODO */
+public String callRemote(String id) { ... }`,
+    options: [
+      "@Retry(maxRetries = 3, delay = 200, abortOn = IllegalArgumentException.class)",
+      "@Retry(attempts = 3, wait = 200, ignore = IllegalArgumentException.class)",
+      "@Retry(maxRetries = 3, delay = 200, skipOn = IllegalArgumentException.class)",
+      "@Retry(count = 3, delayMs = 200, unless = IllegalArgumentException.class)"
+    ],
+    correct: 0,
+    explanation: "Los atributos exactos de `@Retry` en MicroProfile Fault Tolerance son `maxRetries`, `delay` (por defecto en milisegundos, configurable con `delayUnit`), `retryOn` y `abortOn`.",
+    kidTip: "En `@Retry`: `abortOn = MiExcepcion.class` detiene los reintentos inmediatamente; `retryOn` indica en cuáles sí reintentar."
+  },
+  {
+    id: "ft-prac-2",
+    module: "faulttolerance",
+    category: "code",
+    question: "Configuras `@Timeout(500)` y `@Fallback(fallbackMethod = \"fallbackPrice\")` en un método. ¿Qué requisito OBLIGATORIO debe cumplir `fallbackPrice`?",
+    code: `@Timeout(500)
+@Fallback(fallbackMethod = "fallbackPrice")
+public BigDecimal getPrice(String sku, int qty) {
+    ...
+}`,
+    options: [
+      "Debe tener exactamente los mismos parámetros (String sku, int qty) y el mismo tipo de retorno (BigDecimal)",
+      "No debe recibir ningún parámetro",
+      "Debe recibir un parámetro extra Throwable al final",
+      "Debe ser static y devolver Response"
+    ],
+    correct: 0,
+    explanation: "En MicroProfile Fault Tolerance, el `fallbackMethod` debe estar en la misma clase y tener EXACTAMENTE la misma firma (mismos tipos de parámetros en el mismo orden y mismo tipo de retorno). Si falla, Quarkus lanza `FaultToleranceDefinitionException` al arrancar!",
+    kidTip: "Trampa clásica de examen: `fallbackMethod` = MISMA lista de parámetros y MISMO tipo de retorno (nunca le agregues `Throwable`!)."
+  },
+  {
+    id: "ft-prac-3",
+    module: "faulttolerance",
+    category: "code",
+    question: "Tienes `@CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)`. ¿Qué ocurre después de 4 llamadas consecutivas donde 2 fallaron?",
+    code: `@CircuitBreaker(
+    requestVolumeThreshold = 4,
+    failureRatio = 0.5,
+    delay = 5000,
+    successThreshold = 2
+)
+public String fetch() { ... }`,
+    options: [
+      "El circuito se ABRE por 5000 ms y las nuevas llamadas fallan rápido con CircuitBreakerOpenException",
+      "El circuito se mantiene cerrado porque 2/4 es exactamente 0.5 y necesita > 0.5",
+      "Se reintenta automáticamente 2 veces",
+      "Se espera a que lleguen 5000 llamadas más"
+    ],
+    correct: 0,
+    explanation: "`failureRatio = 0.5` significa que si el ratio de fallos es **>= 0.5** (2 de 4 = 0.5) dentro de la ventana de `requestVolumeThreshold = 4`, el circuito se **ABRE** durante `delay = 5000 ms`. Luego pasa a half-open y necesita `successThreshold = 2` éxitos seguidos para cerrarse.",
+    kidTip: "Alcanzado `requestVolumeThreshold` con fallos >= `failureRatio`, el circuito ABRE y lanza `CircuitBreakerOpenException`."
+  },
+  {
+    id: "ft-prac-4",
+    module: "faulttolerance",
+    category: "code",
+    question: "Quieres limitar a un máximo de 5 ejecuciones concurrentes de un método costoso, rechazando las demás con `BulkheadException`. ¿Qué anotación usas?",
+    code: `/* TODO: máximo 5 llamadas concurrentes */
+public Report generateReport() { ... }`,
+    options: [
+      "@Bulkhead(5)",
+      "@RateLimit(5)",
+      "@ConcurrencyLimit(5)",
+      "@Semaphore(5)"
+    ],
+    correct: 0,
+    explanation: "`@Bulkhead(5)` (atributo `value = 5`) limita las llamadas concurrentes simultáneas a 5. (En métodos `@Asynchronous` también acepta `waitingTaskQueue`).",
+    kidTip: "`@Bulkhead(N)` = máximo N ejecuciones al mismo tiempo."
+  },
+  {
+    id: "ft-prac-5",
+    module: "faulttolerance",
+    category: "code",
+    question: "Si combinas `@Fallback`, `@Retry`, `@Timeout` y `@CircuitBreaker` en un mismo método, ¿cuál es el orden de ejecución (de afuera hacia adentro)?",
+    code: `@Fallback(fallbackMethod = "fb")
+@Retry(maxRetries = 2)
+@CircuitBreaker
+@Timeout(500)
+public String call() { ... }`,
+    options: [
+      "Fallback -> Retry -> CircuitBreaker -> Timeout -> método (el Fallback envuelve todo al final)",
+      "Timeout -> Retry -> Fallback -> CircuitBreaker",
+      "Depende del orden en que escribas las anotaciones arriba del método",
+      "CircuitBreaker -> Fallback -> Timeout -> Retry"
+    ],
+    correct: 0,
+    explanation: "El orden en MicroProfile Fault Tolerance es fijo (no importa el orden de escritura): `Fallback` es el más externo (captura si todo falla), luego `Retry` reintenta cada intento que pasa por `CircuitBreaker`, `Bulkhead` y `Timeout`.",
+    kidTip: "Orden fijo: `Fallback` afuera del todo (salvavidas final), `Retry` reintenta al `CircuitBreaker` / `Timeout`."
+  },
+  {
+    id: "ft-prac-6",
+    module: "faulttolerance",
+    category: "code",
+    question: "¿Cómo puedes sobrescribir en `application.properties` el `maxRetries` de `@Retry` del método `getWeather` de `com.acme.WeatherService` sin recompilar?",
+    code: `package com.acme;
+public class WeatherService {
+    @Retry(maxRetries = 2)
+    public String getWeather() { ... }
+}`,
+    options: [
+      "com.acme.WeatherService/getWeather/Retry/maxRetries=5",
+      "quarkus.fault-tolerance.WeatherService.getWeather.maxRetries=5",
+      "mp.fault.tolerance.Retry.maxRetries=5",
+      "com.acme.WeatherService.getWeather.Retry.maxRetries=5"
+    ],
+    correct: 0,
+    explanation: "MicroProfile Fault Tolerance usa barras `/` con la forma `<ClaseCompleta>/<metodo>/<Anotacion>/<atributo>=<valor>` (o `<ClaseCompleta>/<Anotacion>/<atributo>` para nivel clase).",
+    kidTip: "Configurar Fault Tolerance por properties usa barras `/`: `paquete.Clase/metodo/Retry/maxRetries=5`."
+  },
+
+  // --- MICROPROFILE HEALTH CHECK (5) ---
+  {
+    id: "hlth-prac-1",
+    module: "health",
+    category: "code",
+    question: "Debes crear un check de Liveness llamado `\"service-alive\"` que devuelva UP con un dato extra `\"version\": \"1.0\"`. ¿Cómo se implementa la clase?",
+    code: `/* TODO: anotación de scope y tipo de health */
+public class AppLivenessCheck implements HealthCheck {
+    @Override
+    public HealthCheckResponse call() {
+        // TODO: retornar UP con nombre "service-alive" y data version=1.0
+    }
+}`,
+    options: [
+      "@Liveness @ApplicationScoped + return HealthCheckResponse.named(\"service-alive\").up().withData(\"version\", \"1.0\").build();",
+      "@HealthCheck(type = LIVENESS) + return HealthCheckResponse.up(\"service-alive\");",
+      "@Liveness @Path(\"/q/health/live\") + return Response.ok().build();",
+      "@Readiness + return HealthCheckResponse.ok(\"service-alive\").build();"
+    ],
+    correct: 0,
+    explanation: "Un Health Check implementa `org.eclipse.microprofile.health.HealthCheck`, se anota con `@Liveness` (o `@Readiness` / `@Startup`) y `@ApplicationScoped`, y construye la respuesta con `HealthCheckResponse.named(\"...\").up().withData(...).build()`.",
+    kidTip: "`HealthCheckResponse.named(\"...\").up().withData(\"k\", \"v\").build()` (o `.down()`)."
+  },
+  {
+    id: "hlth-prac-2",
+    module: "health",
+    category: "code",
+    question: "Tienes un check `@Readiness` que verifica si la API externa está disponible. Si `isExternalUp()` es `false`, ¿qué debe retornar para que `/q/health/ready` responda HTTP `503 Service Unavailable`?",
+    code: `@Readiness
+@ApplicationScoped
+public class ExternalApiHealthCheck implements HealthCheck {
+    @Override
+    public HealthCheckResponse call() {
+        if (!isExternalUp()) {
+            // TODO
+        }
+        return HealthCheckResponse.up("external-api");
+    }
+}`,
+    options: [
+      "return HealthCheckResponse.down(\"external-api\");",
+      "throw new ServiceUnavailableException();",
+      "return null;",
+      "return HealthCheckResponse.named(\"external-api\").status(503).build();"
+    ],
+    correct: 0,
+    explanation: "Cuando cualquier `HealthCheck` retorna un `HealthCheckResponse` con estado `DOWN` (`HealthCheckResponse.down(\"nombre\")` o `.down().build()`), SmallRye Health automáticamente cambia el HTTP status del endpoint `/q/health/ready` a `503`.",
+    kidTip: "Nunca lances excepción HTTP manual en `HealthCheck`: simplemente retorna `.down()` y Quarkus devuelve 503."
+  },
+  {
+    id: "hlth-prac-3",
+    module: "health",
+    category: "code",
+    question: "¿Qué diferencia práctica existe entre `@Liveness`, `@Readiness` y `@Startup` en MicroProfile Health?",
+    code: `// Endpoints generados por quarkus-smallrye-health:
+// /q/health/live
+// /q/health/ready
+// /q/health/started`,
+    options: [
+      "@Liveness indica si la app está viva (si falla, Kubernetes reinicia el pod); @Readiness si está lista para recibir tráfico; @Startup si terminó de arrancar",
+      "@Liveness es solo para base de datos y @Readiness solo para CPU",
+      "Los tres hacen exactamente lo mismo y solo cambia el nombre",
+      "@Startup se ejecuta en cada petición HTTP"
+    ],
+    correct: 0,
+    explanation: "En Kubernetes/OpenShift: Liveness DOWN -> reinicio del contenedor; Readiness DOWN -> saca al pod del Service/LoadBalancer temporalmente; Startup DOWN -> retrasa las sondas liveness/readiness hasta que arranque.",
+    kidTip: "Liveness = ¿sigo vivo? | Readiness = ¿puedo recibir tráfico ya? | Startup = ¿terminé de arrancar?"
+  },
+  {
+    id: "hlth-prac-4",
+    module: "health",
+    category: "code",
+    question: "Tu Health Check necesita consultar un servicio reactivo que devuelve `Uni<Boolean>` sin bloquear el event loop. ¿Qué interfaz debes implementar en lugar de `HealthCheck`?",
+    code: `@Readiness
+@ApplicationScoped
+public class ReactiveDbCheck implements /* TODO */ {
+    @Override
+    public Uni<HealthCheckResponse> call() {
+        return checkDb().map(ok -> ok
+            ? HealthCheckResponse.up("db")
+            : HealthCheckResponse.down("db"));
+    }
+}`,
+    options: [
+      "AsyncHealthCheck",
+      "ReactiveHealthCheck",
+      "UniHealthCheck",
+      "NonBlockingHealthCheck"
+    ],
+    correct: 0,
+    explanation: "SmallRye Health provee `io.smallrye.health.api.AsyncHealthCheck`, cuyo método `call()` retorna `Uni<HealthCheckResponse>`.",
+    kidTip: "HealthCheck síncrono = `HealthCheck`. HealthCheck reactivo (`Uni`) = `AsyncHealthCheck`."
+  },
+  {
+    id: "hlth-prac-5",
+    module: "health",
+    category: "code",
+    question: "¿Qué extensión de Quarkus debes añadir al `pom.xml` para habilitar los endpoints `/q/health`, `/q/health/live` y `/q/health/ready`?",
+    code: `<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId><!-- TODO --></artifactId>
+</dependency>`,
+    options: [
+      "quarkus-smallrye-health",
+      "quarkus-micrometer-health",
+      "quarkus-microprofile-health",
+      "quarkus-actuator"
+    ],
+    correct: 0,
+    explanation: "La extensión oficial en Quarkus es `quarkus-smallrye-health`.",
+    kidTip: "Health en Quarkus siempre es `quarkus-smallrye-health` y vive bajo `/q/health`."
+  },
+
+  // --- MICROMETER METRICS (5) ---
+  {
+    id: "met-prac-1",
+    module: "metrics",
+    category: "code",
+    question: "Quieres contar cuántas veces se llama al método `createOrder()` y medir su tiempo de ejecución usando anotaciones de Micrometer. ¿Qué anotaciones (y paquete) usas?",
+    code: `/* TODO: anotar para contar y medir duración */
+public Order createOrder(OrderReq req) { ... }`,
+    options: [
+      "@Counted(\"orders.created\") y @Timed(\"orders.duration\") de io.micrometer.core.annotation",
+      "@Counted y @Timed de org.eclipse.microprofile.metrics.annotation",
+      "@MetricCount y @MetricTimer de io.quarkus.micrometer",
+      "@Counter y @Timer de jakarta.metrics"
+    ],
+    correct: 0,
+    explanation: "EX378 usa **Micrometer** (`io.micrometer.core.annotation.Counted` y `Timed`), NO la especificación legada de MicroProfile Metrics (`org.eclipse.microprofile.metrics`).",
+    kidTip: "¡Ojo con los imports! En el examen usa `io.micrometer.core.annotation.Counted` y `Timed`, nunca `org.eclipse.microprofile.metrics`."
+  },
+  {
+    id: "met-prac-2",
+    module: "metrics",
+    category: "code",
+    question: "Inyectas `MeterRegistry` de Micrometer en un servicio y quieres incrementar un contador llamado `\"payments.processed\"` con el tag `status=\"success\"`. ¿Cuál es la sintaxis correcta?",
+    code: `@Inject
+MeterRegistry registry;
+
+public void onSuccess() {
+    // TODO: incrementar contador con tag status=success
+}`,
+    options: [
+      "registry.counter(\"payments.processed\", \"status\", \"success\").increment();",
+      "registry.getCounter(\"payments.processed\").inc(\"status\", \"success\");",
+      "registry.addMetric(\"payments.processed\", 1);",
+      "Counter.increment(\"payments.processed\", \"status=success\");"
+    ],
+    correct: 0,
+    explanation: "En `MeterRegistry`, los tags se pasan como pares clave-valor alternos: `registry.counter(\"nombre\", \"clave1\", \"valor1\", ...).increment()`.",
+    kidTip: "`registry.counter(\"nombre\", \"tagKey\", \"tagVal\").increment()`."
+  },
+  {
+    id: "met-prac-3",
+    module: "metrics",
+    category: "code",
+    question: "Quieres exponer un `Gauge` en Micrometer que reporte en tiempo real el tamaño de una lista/cola `pendingJobs`. ¿Cómo lo registras en el constructor o `@PostConstruct`?",
+    code: `private final Queue<Job> pendingJobs = new ConcurrentLinkedQueue<>();
+
+public JobService(MeterRegistry registry) {
+    // TODO: registrar gauge "jobs.pending"
+}`,
+    options: [
+      "registry.gauge(\"jobs.pending\", pendingJobs, Collection::size);",
+      "registry.counter(\"jobs.pending\", pendingJobs.size());",
+      "@Gauge(\"jobs.pending\") int size() { return pendingJobs.size(); }",
+      "registry.setGauge(\"jobs.pending\", pendingJobs.size());"
+    ],
+    correct: 0,
+    explanation: "`registry.gauge(\"nombre\", objetoObservado, objeto -> objeto.size())` mantiene una referencia débil al objeto y evalúa la función cada vez que Prometheus raspa `/q/metrics`.",
+    kidTip: "Para valores que suben y bajan (como el tamaño de una cola), usa `registry.gauge(\"nombre\", coleccion, Collection::size)`."
+  },
+  {
+    id: "met-prac-4",
+    module: "metrics",
+    category: "code",
+    question: "¿Qué extensión debes añadir para que Micrometer exponga las métricas en formato Prometheus en `/q/metrics`?",
+    code: `<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId><!-- TODO --></artifactId>
+</dependency>`,
+    options: [
+      "quarkus-micrometer-registry-prometheus",
+      "quarkus-smallrye-metrics",
+      "quarkus-prometheus-exporter",
+      "quarkus-micrometer-core"
+    ],
+    correct: 0,
+    explanation: "`quarkus-micrometer-registry-prometheus` incluye Micrometer y expone automáticamente el endpoint `/q/metrics` para Prometheus (además de métricas JVM y HTTP automáticas).",
+    kidTip: "Extensión de métricas en EX378: `quarkus-micrometer-registry-prometheus` -> ruta `/q/metrics`."
+  },
+  {
+    id: "met-prac-5",
+    module: "metrics",
+    category: "code",
+    question: "Si usas `@Timed(\"checkout.time\")` de Micrometer, ¿qué métrica de tiempo adicional te permite obtener percentiles como p50 y p95?",
+    code: `@Timed(value = "checkout.time", /* TODO: percentiles 0.5 y 0.95 */)
+public void checkout() { ... }`,
+    options: [
+      "percentiles = {0.5, 0.95}",
+      "quantiles = {50, 95}",
+      "histogram = true",
+      "sla = {0.5, 0.95}"
+    ],
+    correct: 0,
+    explanation: "La anotación `@Timed` de Micrometer acepta `percentiles = {0.5, 0.95}` (valores entre 0.0 y 1.0) y `histogram = true`.",
+    kidTip: "En `@Timed`: `percentiles = {0.5, 0.95}`."
+  },
+
+  // --- CONFIGURACIÓN (4) ---
+  {
+    id: "cfg-prac-1",
+    module: "config",
+    category: "code",
+    question: "Tienes `app.greeting=Hola` en `application.properties`, la variable de entorno `APP_GREETING=Buenas`, y ejecutas el JAR con `-Dapp.greeting=QueTal`. ¿Qué valor inyectará `@ConfigProperty(name = \"app.greeting\")`?",
+    code: `@ConfigProperty(name = "app.greeting", defaultValue = "Hi")
+String greeting;`,
+    options: [
+      "QueTal (System property -D tiene prioridad 400 > Env var 300 > application.properties 250 > defaultValue)",
+      "Buenas (la variable de entorno siempre gana)",
+      "Hola (application.properties manda)",
+      "Hi (el defaultValue siempre sobrescribe)"
+    ],
+    correct: 0,
+    explanation: "Orden de precedencia SmallRye Config (de mayor a menor): 1) System properties `-D` (400), 2) Environment variables (300), 3) `.env` (295), 4) `config/application.properties` (260), 5) `application.properties` en classpath (250), 6) `defaultValue`.",
+    kidTip: "Recuerda la escalera: `-D` (400) > Variable de entorno (300) > `config/application.properties` (260) > `application.properties` (250)."
+  },
+  {
+    id: "cfg-prac-2",
+    module: "config",
+    category: "code",
+    question: "Quieres sobrescribir la propiedad `billing.tax-rate=0.15` usando una variable de entorno del sistema operativo. ¿Qué nombre exacto debe tener la variable de entorno?",
+    code: `# En application.properties:
+billing.tax-rate=0.15`,
+    options: [
+      "BILLING_TAX_RATE",
+      "BILLING.TAX-RATE",
+      "billing_tax_rate",
+      "QUARKUS_BILLING_TAX_RATE"
+    ],
+    correct: 0,
+    explanation: "SmallRye Config convierte puntos (`.`) y guiones (`-`) a guiones bajos (`_`) y pasa todo a MAYÚSCULAS: `billing.tax-rate` -> `BILLING_TAX_RATE`.",
+    kidTip: "Regla de variable de entorno: todo a MAYÚSCULAS y cualquier `.` o `-` se vuelve `_`."
+  },
+  {
+    id: "cfg-prac-3",
+    module: "config",
+    category: "code",
+    question: "En `application.properties`, tienes `app.ports=8080,8443` y una interfaz `@ConfigMapping(prefix = \"app\")`. ¿Cómo mapeas `ports`?",
+    code: `@ConfigMapping(prefix = "app")
+public interface AppConfig {
+    // TODO: mapear app.ports=8080,8443
+}`,
+    options: [
+      "List<Integer> ports();",
+      "int[] ports();",
+      "@Csv List<Integer> ports();",
+      "String ports();"
+    ],
+    correct: 0,
+    explanation: "SmallRye Config convierte automáticamente valores separados por coma (`8080,8443`) a `List<Integer>` o `Set<Integer>` en `@ConfigMapping` y `@ConfigProperty`.",
+    kidTip: "Listas separadas por coma en `application.properties` se inyectan directo como `List<T>` o `Set<T>`."
+  },
+  {
+    id: "cfg-prac-4",
+    module: "config",
+    category: "code",
+    question: "Quieres que `quarkus.log.level` sea `DEBUG` solo en modo desarrollo y `WARN` en producción usando `application.properties`. ¿Cómo lo escribes?",
+    code: `# Solo en dev: DEBUG
+# Por defecto (prod): WARN`,
+    options: [
+      "%dev.quarkus.log.level=DEBUG\nquarkus.log.level=WARN",
+      "dev.quarkus.log.level=DEBUG\nprod.quarkus.log.level=WARN",
+      "[dev]\nquarkus.log.level=DEBUG",
+      "quarkus.log.level@dev=DEBUG"
+    ],
+    correct: 0,
+    explanation: "Los perfiles en Quarkus se anteponen con `%nombre_perfil.` (`%dev.`, `%test.`, `%prod.`). Sin prefijo aplica a todos salvo que el perfil activo lo sobrescriba.",
+    kidTip: "Prefijo de perfil en `application.properties`: `%dev.`, `%test.`, `%prod.`."
+  },
+
+  // --- JWT RBAC (4) ---
+  {
+    id: "jwt-prac-1",
+    module: "jwt",
+    category: "code",
+    question: "Tienes un recurso REST anotado con `@ApplicationScoped` y quieres inyectar `JsonWebToken jwt` para leer el usuario en cada petición. ¿Qué trampa ocurre si inyectas `JsonWebToken` directo en un bean `@ApplicationScoped`?",
+    code: `@Path("/secure")
+@ApplicationScoped
+public class SecureResource {
+    @Inject
+    JsonWebToken jwt; // ¿Funciona o qué debes usar?
+}`,
+    options: [
+      "En @ApplicationScoped (singleton) se recomienda @RequestScoped en el recurso o inyectar Instance<JsonWebToken> / SecurityIdentity para no reutilizar un contexto incorrecto",
+      "JsonWebToken no se puede inyectar con @Inject, solo con @Context",
+      "Solo funciona en @Singleton",
+      "Hay que usar @ConfigProperty para leer el JWT"
+    ],
+    correct: 0,
+    explanation: "`JsonWebToken` es `@RequestScoped`. Quarkus recomienda anotar los recursos REST que inyectan `JsonWebToken` o `@Claim` con `@RequestScoped` (o inyectar `SecurityIdentity` / `Instance<JsonWebToken>`).",
+    kidTip: "Cuando inyectes `JsonWebToken` o `@Claim`, pon `@RequestScoped` en tu clase Resource."
+  },
+  {
+    id: "jwt-prac-2",
+    module: "jwt",
+    category: "code",
+    question: "Quieres que solo usuarios con rol `\"admin\"` o `\"auditor\"` puedan llamar al método `deleteAll()`, mientras que `healthInfo()` sea público para cualquiera sin token. ¿Qué anotaciones usas?",
+    code: `public class AdminResource {
+    /* 1. Solo admin o auditor */
+    @DELETE public void deleteAll() { ... }
+
+    /* 2. Público sin token */
+    @GET @Path("/info") public String healthInfo() { return "ok"; }
+}`,
+    options: [
+      "1) @RolesAllowed({\"admin\", \"auditor\"})   2) @PermitAll",
+      "1) @Secured({\"admin\", \"auditor\"})   2) @Public",
+      "1) @Roles({\"admin\", \"auditor\"})   2) @AllowAnonymous",
+      "1) @Authenticated   2) @DenyAll"
+    ],
+    correct: 0,
+    explanation: "Jakarta/MicroProfile Security usa `@RolesAllowed({\"admin\", \"auditor\"})` para exigir alguno de esos roles (del claim `groups` en JWT), `@PermitAll` para acceso público, `@Authenticated` para cualquier usuario autenticado y `@DenyAll` para bloquear a todos.",
+    kidTip: "`@RolesAllowed` = roles específicos | `@Authenticated` = cualquier token válido | `@PermitAll` = público | `@DenyAll` = nadie."
+  },
+  {
+    id: "jwt-prac-3",
+    module: "jwt",
+    category: "code",
+    question: "¿Qué dos propiedades mínimas debes poner en `application.properties` para que Quarkus valide la firma y el emisor (`iss`) de los tokens JWT entrantes?",
+    code: `# Ubicación de la clave pública PEM y el issuer esperado`,
+    options: [
+      "mp.jwt.verify.publickey.location=publicKey.pem\nmp.jwt.verify.issuer=https://example.com/issuer",
+      "quarkus.jwt.public-key=publicKey.pem\nquarkus.jwt.issuer=https://example.com/issuer",
+      "mp.jwt.secret=publicKey.pem\nmp.jwt.aud=https://example.com/issuer",
+      "smallrye.jwt.verify.key=publicKey.pem"
+    ],
+    correct: 0,
+    explanation: "Las propiedades estándar de MicroProfile JWT en Quarkus son `mp.jwt.verify.publickey.location` y `mp.jwt.verify.issuer`.",
+    kidTip: "Siempre son `mp.jwt.verify.publickey.location` y `mp.jwt.verify.issuer`."
+  },
+  {
+    id: "jwt-prac-4",
+    module: "jwt",
+    category: "code",
+    question: "Para un test o endpoint generador de tokens usando `quarkus-smallrye-jwt-build`, ¿cómo generas y firmas un JWT con `upn` y rol `\"admin\"`?",
+    code: `String token = /* TODO: generar JWT firmado */;`,
+    options: [
+      "Jwt.issuer(\"https://example.com/issuer\").upn(\"carlos@datum.com\").groups(Set.of(\"admin\")).sign()",
+      "JsonWebToken.create().issuer(\"...\").role(\"admin\").build()",
+      "JwtBuilder.withUser(\"carlos\").sign()",
+      "TokenGenerator.generate(\"admin\")"
+    ],
+    correct: 0,
+    explanation: "`io.smallrye.jwt.build.Jwt` permite construir y firmar tokens con la clave privada configurada en `smallrye.jwt.sign.key.location`: `Jwt.issuer(...).upn(...).groups(...).sign()`.",
+    kidTip: "Para crear JWTs en tests o servicios: `Jwt.issuer(...).upn(...).groups(Set.of(\"...\")).sign()`."
+  },
+
+  // --- REACTIVE MESSAGING (4) ---
+  {
+    id: "msg-prac-1",
+    module: "messaging",
+    category: "code",
+    question: "Quieres enviar un mensaje al canal `\"orders-out\"` de forma imperativa desde un método `@POST` REST (no desde un `@Outgoing` automático). ¿Qué inyectas y cómo envías?",
+    code: `@Path("/orders")
+public class OrderResource {
+    /* TODO: inyectar Emitter para canal "orders-out" */
+
+    @POST
+    public void send(Order order) {
+        // TODO: enviar order
+    }
+}`,
+    options: [
+      "@Inject @Channel(\"orders-out\") Emitter<Order> emitter; y luego emitter.send(order);",
+      "@Inject @Outgoing(\"orders-out\") Producer<Order> producer; y producer.publish(order);",
+      "@Inject @Topic(\"orders-out\") KafkaTemplate<Order> kafka;",
+      "@Inject Emitter<Order> emitter; sin especificar canal"
+    ],
+    correct: 0,
+    explanation: "`@Channel(\"nombre-canal\") Emitter<T>` permite emitir mensajes imperativamente desde cualquier bean CDI llamando a `emitter.send(payload)`.",
+    kidTip: "Para publicar desde un endpoint REST hacia Kafka/canal: `@Inject @Channel(\"canal\") Emitter<T>`."
+  },
+  {
+    id: "msg-prac-2",
+    module: "messaging",
+    category: "code",
+    question: "Tienes un consumidor `@Incoming(\"orders-in\")` que guarda la entidad en base de datos usando Panache (`@Transactional`). ¿Qué anotación debes añadir para no bloquear el event loop de Vert.x?",
+    code: `@Incoming("orders-in")
+@Transactional
+/* TODO: evitar bloqueo en el event loop */
+public void consume(Order order) {
+    order.persist();
+}`,
+    options: [
+      "@Blocking",
+      "@Async",
+      "@NonBlocking",
+      "@Worker"
+    ],
+    correct: 0,
+    explanation: "Los consumidores `@Incoming` se ejecutan en el event loop por defecto. Si ejecutan código bloqueante (JPA/Panache clásico), debes anotarlos con `@Blocking` (`io.smallrye.common.annotation.Blocking`).",
+    kidTip: "`@Incoming` + JPA/Panache = pon `@Blocking`."
+  },
+  {
+    id: "msg-prac-3",
+    module: "messaging",
+    category: "code",
+    question: "Tienes un método `@Incoming(\"prices-in\") @Outgoing(\"prices-out\")` que lee del topic Kafka `prices` y publica en `converted-prices`. ¿Cómo se configuran el conector y el topic de entrada en `application.properties`?",
+    code: `# Configurar canal entrante "prices-in" con Kafka y topic "prices"`,
+    options: [
+      "mp.messaging.incoming.prices-in.connector=smallrye-kafka\nmp.messaging.incoming.prices-in.topic=prices",
+      "quarkus.kafka.incoming.prices-in.topic=prices",
+      "mp.messaging.channel.prices-in.kafka-topic=prices",
+      "smallrye.messaging.in.prices-in.topic=prices"
+    ],
+    correct: 0,
+    explanation: "El patrón de configuración es `mp.messaging.<incoming|outgoing>.<nombre-canal>.connector=smallrye-kafka` y `.topic=<nombre-topic>`.",
+    kidTip: "Estructura fija: `mp.messaging.incoming.<canal>.connector=smallrye-kafka` y `.topic=...`."
+  },
+  {
+    id: "msg-prac-4",
+    module: "messaging",
+    category: "code",
+    question: "Si tu consumidor `@Incoming(\"events\")` recibe `Message<String>` en lugar de `String` directamente, ¿qué responsabilidad tienes al terminar de procesarlo?",
+    code: `@Incoming("events")
+public CompletionStage<Void> onEvent(Message<String> msg) {
+    String payload = msg.getPayload();
+    // procesar...
+    return /* TODO: confirmar mensaje */;
+}`,
+    options: [
+      "msg.ack() (o msg.nack(throwable) si falló)",
+      "msg.commit()",
+      "No hay que hacer nada, se confirma solo",
+      "msg.close()"
+    ],
+    correct: 0,
+    explanation: "Al recibir `Message<T>`, tomas el control manual del acknowledgement: debes devolver `msg.ack()` en éxito o `msg.nack(ex)` en error.",
+    kidTip: "Si recibes `T`, el ack es automático; si recibes `Message<T>`, debes retornar `msg.ack()`."
+  },
+
+  // --- OPENTELEMETRY (4) ---
+  {
+    id: "otel-prac-1",
+    module: "otel",
+    category: "code",
+    question: "Quieres crear un span personalizado automáticamente cuando se invoca un método de negocio y capturar su parámetro `orderId` como atributo del span. ¿Qué anotaciones de OpenTelemetry usas?",
+    code: `/* TODO: crear span "process-order" */
+public void processOrder(/* TODO: atributo "order.id" */ String orderId) {
+    ...
+}`,
+    options: [
+      "@WithSpan(\"process-order\") y @SpanAttribute(\"order.id\")",
+      "@Traced(\"process-order\") y @Tag(\"order.id\")",
+      "@NewSpan(\"process-order\") y @SpanParam(\"order.id\")",
+      "@Span(\"process-order\") y @Attribute(\"order.id\")"
+    ],
+    correct: 0,
+    explanation: "En `io.opentelemetry.instrumentation.annotations`: `@WithSpan(\"nombre\")` crea un nuevo span hijo alrededor del método y `@SpanAttribute(\"clave\")` registra el valor del parámetro como atributo.",
+    kidTip: "`@WithSpan` en el método + `@SpanAttribute` en el parámetro."
+  },
+  {
+    id: "otel-prac-2",
+    module: "otel",
+    category: "code",
+    question: "Dentro de un método ya trazado (por ejemplo un endpoint REST), quieres añadir un atributo `\"customer.tier\" = \"VIP\"` al span activo actual sin crear otro span. ¿Cómo lo haces?",
+    code: `public void handle() {
+    // TODO: agregar atributo al span actual
+}`,
+    options: [
+      "Span.current().setAttribute(\"customer.tier\", \"VIP\");",
+      "Tracer.getActiveSpan().addTag(\"customer.tier\", \"VIP\");",
+      "OpenTelemetry.currentSpan().put(\"customer.tier\", \"VIP\");",
+      "TraceContext.set(\"customer.tier\", \"VIP\");"
+    ],
+    correct: 0,
+    explanation: "`io.opentelemetry.api.trace.Span.current()` obtiene el span activo en el contexto actual y `.setAttribute(key, value)` (o `.addEvent(...)`) lo enriquece.",
+    kidTip: "`Span.current().setAttribute(\"clave\", valor)` y `Span.current().addEvent(\"evento\")`."
+  },
+  {
+    id: "otel-prac-3",
+    module: "otel",
+    category: "code",
+    question: "¿Qué propiedades configuran el nombre del servicio en las trazas y el endpoint OTLP hacia Jaeger/Collector en `application.properties`?",
+    code: `# Nombre del servicio y destino OTLP gRPC`,
+    options: [
+      "quarkus.application.name=orders-service\nquarkus.otel.exporter.otlp.endpoint=http://localhost:4317",
+      "quarkus.jaeger.service-name=orders-service\nquarkus.jaeger.endpoint=http://localhost:14268",
+      "otel.service=orders-service\notel.url=http://localhost:4317",
+      "mp.otel.name=orders-service"
+    ],
+    correct: 0,
+    explanation: "Con `quarkus-opentelemetry`, el nombre del servicio viene de `quarkus.application.name` (o `quarkus.otel.service.name`) y el exportador OTLP se apunta con `quarkus.otel.exporter.otlp.endpoint=http://localhost:4317`.",
+    kidTip: "En Quarkus 3 / EX378 es `quarkus-opentelemetry` con `quarkus.otel.exporter.otlp.endpoint` (ya NO Jaeger legado)."
+  },
+  {
+    id: "otel-prac-4",
+    module: "otel",
+    category: "code",
+    question: "Si tu Microservicio A llama al Microservicio B mediante REST Client Reactive y ambos tienen `quarkus-opentelemetry`, ¿necesitas copiar manualmente el `traceparent` header?",
+    code: `// Servicio A -> REST Client Reactive -> Servicio B`,
+    options: [
+      "No; quarkus-opentelemetry propaga e instrumenta automáticamente las cabeceras W3C Trace Context en HTTP, REST Client y Kafka",
+      "Sí, obligatorio añadir @ClientHeaderParam(\"traceparent\")",
+      "Solo funciona si usas @WithSpan en el REST Client",
+      "Sí, hay que configurar quarkus.rest-client.propagate-headers=traceparent"
+    ],
+    correct: 0,
+    explanation: "`quarkus-opentelemetry` instrumenta automáticamente servidor HTTP, REST Client Reactive y Reactive Messaging (Kafka), inyectando y extrayendo `traceparent` sin código extra.",
+    kidTip: "La propagación de trazas entre REST Client y Kafka es automática con `quarkus-opentelemetry`."
+  },
+
+  // --- MICROPROFILE OPENAPI (4) ---
+  {
+    id: "oapi-prac-1",
+    module: "openapi",
+    category: "code",
+    question: "Quieres documentar en Swagger/OpenAPI que un endpoint `@POST` puede devolver `201` (creado) o `400` (datos inválidos). ¿Qué anotación de MicroProfile OpenAPI usas?",
+    code: `@POST
+/* TODO: documentar resumen y posibles códigos 201 y 400 */
+public Response create(Book b) { ... }`,
+    options: [
+      "@Operation(summary = \"Crear libro\")\n@APIResponse(responseCode = \"201\", description = \"Creado\")\n@APIResponse(responseCode = \"400\", description = \"Inválido\")",
+      "@ApiOperation(\"Crear libro\")\n@ApiResponses({@ApiResponse(code = 201), @ApiResponse(code = 400)})",
+      "@OpenApiDoc(summary = \"Crear libro\", codes = {201, 400})",
+      "@SwaggerResponse(201)"
+    ],
+    correct: 0,
+    explanation: "MicroProfile OpenAPI usa `@Operation` y `@APIResponse(responseCode = \"...\", description = \"...\")` (los códigos son String entre comillas; `@ApiOperation` es de Swagger v2 legado).",
+    kidTip: "En MicroProfile OpenAPI: `@Operation` + `@APIResponse(responseCode = \"201\", ...)` (código como String!)."
+  },
+  {
+    id: "oapi-prac-2",
+    module: "openapi",
+    category: "code",
+    question: "En tu DTO `BookDto`, quieres documentar el campo `isbn` con descripción, ejemplo y marcarlo como obligatorio en el esquema OpenAPI. ¿Qué anotación usas?",
+    code: `public class BookDto {
+    /* TODO: documentar campo en esquema OpenAPI */
+    public String isbn;
+}`,
+    options: [
+      "@Schema(description = \"Código ISBN\", example = \"978-3-16-148410-0\", required = true)",
+      "@Parameter(description = \"Código ISBN\", required = true)",
+      "@ApiModelProperty(value = \"Código ISBN\", required = true)",
+      "@OpenApiField(example = \"978-3-16-148410-0\")"
+    ],
+    correct: 0,
+    explanation: "`@Schema` documenta clases y propiedades de modelos/DTOs en OpenAPI; `@Parameter` se usa sobre parámetros de métodos REST (`@PathParam`, `@QueryParam`).",
+    kidTip: "DTOs/campos = `@Schema`. Parámetros de endpoint (`@PathParam`/`@QueryParam`) = `@Parameter`."
+  },
+  {
+    id: "oapi-prac-3",
+    module: "openapi",
+    category: "code",
+    question: "En modo dev (`/q/swagger-ui`) Swagger UI funciona, pero al compilar para producción desaparece. ¿Qué propiedad en `application.properties` lo habilita también en producción?",
+    code: `# Incluir Swagger UI en build de producción`,
+    options: [
+      "quarkus.swagger-ui.always-include=true",
+      "quarkus.openapi.swagger-ui.prod=true",
+      "%prod.quarkus.swagger-ui.enabled=true",
+      "mp.openapi.swagger.always=true"
+    ],
+    correct: 0,
+    explanation: "Por defecto Swagger UI solo se incluye en dev/test. Para exponer `/q/swagger-ui` en producción se configura `quarkus.swagger-ui.always-include=true`.",
+    kidTip: "`quarkus.swagger-ui.always-include=true` habilita `/q/swagger-ui` en producción; `/q/openapi` siempre está activo."
+  },
+  {
+    id: "oapi-prac-4",
+    module: "openapi",
+    category: "code",
+    question: "¿Qué anotaciones usas para definir el título/versión global de la API y agrupar los endpoints de un recurso bajo una categoría visual en Swagger UI?",
+    code: `/* 1. Título y versión en una clase Application */
+/* 2. Agrupar endpoints en BookResource */`,
+    options: [
+      "1) @OpenAPIDefinition(info = @Info(title = \"...\", version = \"1.0\"))   2) @Tag(name = \"Books\")",
+      "1) @SwaggerDefinition(...)   2) @ApiGroup(\"Books\")",
+      "1) @ApiInfo(title = \"...\")   2) @Category(\"Books\")",
+      "1) @OpenApiConfig   2) @OperationGroup(\"Books\")"
+    ],
+    correct: 0,
+    explanation: "`@OpenAPIDefinition(info = @Info(title = \"...\", version = \"...\"))` define los metadatos globales de la API y `@Tag(name = \"...\")` agrupa los endpoints en la UI.",
+    kidTip: "Global = `@OpenAPIDefinition(info = @Info(...))`. Agrupar endpoints = `@Tag(name = \"...\")`."
+  }
+);
+
